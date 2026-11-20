@@ -36,3 +36,6 @@ It obeys robots.txt, rate-limits per host and classifies each event (confirmed /
 
 ## Telegram
 Create a bot with @BotFather, then set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME` and `TELEGRAM_WEBHOOK_SECRET` (see `.env.example`). After deploying: `npm run telegram:webhook -- set https://<your-app>`. Details in CLAUDE.md.
+
+## Artists
+A curated catalog of 500+ well-known artists (India and world) can be browsed A to Z at `/artists/browse`. It is generated from `scripts/gen_artist_catalog.py`; anyone not listed can still be added by typing a name.

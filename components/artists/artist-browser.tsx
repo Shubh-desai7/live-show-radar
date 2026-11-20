@@ -24,6 +24,8 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
   const counts = useMemo(() => letterCounts(inScope), [inScope]);
   const groups = useMemo(() => groupByLetter(letter ? inScope.filter((a) => letterOf(a.artist_name) === letter) : inScope), [inScope, letter]);
 
+  const shown = groups.reduce((n, g) => n + g.artists.length, 0);
+
   function toggle(a: BrowseArtist) {
     const was = followed.has(a.artist_id);
     setError(undefined);
@@ -66,7 +68,7 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
           })}
         </nav>
         <p aria-live="polite" className="text-sm text-mist">
-          {inScope.length} artist{inScope.length === 1 ? "" : "s"}{letter ? ` starting with ${letter}` : ""} · you follow {followed.size}
+          {shown} artist{shown === 1 ? "" : "s"}{letter ? ` starting with ${letter}` : ""} · you follow {followed.size}
           <span className="font-semibold text-hotpink">{error ? ` · ${error}` : ""}</span>
         </p>
       </div>
