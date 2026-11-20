@@ -20,6 +20,9 @@ _DMY = re.compile(r"\b(\d{1,2})" + _SUFFIX + _RANGE + r"\s+" + _M + r"\.?,?\s+(\
 # Dec 20, 2026 / December 20th 2026
 _MDY = re.compile(r"\b" + _M + r"\.?\s+(\d{1,2})" + _SUFFIX + _RANGE + r",?\s+(\d{4})\b", re.IGNORECASE)
 _ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+# 21/11/2026, 21.11.2026, 21-11-2026. Read as day/month/year (the Indian convention) only when that is unambiguous:
+# one side is > 12. A pair like 05/06/2026 is never guessed (see has_ambiguous_numeric_date).
+_NUM = re.compile(r"(?<![\d/.-])(\d{1,2})([/.-])(\d{1,2})\2(\d{4})(?![\d/.-])")
 
 
 def _make(y: int, m: int, d: int):
@@ -38,6 +41,12 @@ def find_date_spans(text: str) -> List[Tuple[int, int, dt.date]]:
         found.append((m.start(), m.end(), _make(int(m.group(3)), _MONTHS[m.group(1).lower()], int(m.group(2)))))
     for m in _ISO.finditer(text):
         found.append((m.start(), m.end(), _make(int(m.group(1)), int(m.group(2)), int(m.group(3)))))
+    for m in _NUM.finditer(text):
+        a, b, y = int(m.group(1)), int(m.group(3)), int(m.group(4))
+        if a > 12 >= b:
+            found.append((m.start(), m.end(), _make(y, b, a)))          # dd/mm/yyyy
+        elif b > 12 >= a:
+            found.append((m.start(), m.end(), _make(y, a, b)))          # mm/dd/yyyy (unambiguous: the second number cannot be a month)
     return [f for f in sorted(found, key=lambda x: x[0]) if f[2] is not None]
 
 
@@ -77,3 +86,18 @@ def find_dates_relative(text: str, published: dt.date) -> List[dt.date]:
                     out.append(d)
                 break
     return out
+
+
+def has_ambiguous_numeric_date(text: str) -> bool:
+    """05/06/2026-style dates where both numbers are <= 12: we do not know which is the month, so we never guess."""
+    return any(int(m.group(1)) <= 12 and int(m.group(3)) <= 12 and m.group(1) != "0" for m in _NUM.finditer(text))
+
+
+def find_yearless_dates(text: str) -> List[str]:
+    """Day+month mentions without a year ("Nov 21", "21 November"): used only to explain a rejection, never to create a date."""
+    hints: List[str] = []
+    for m in _DM.finditer(text):
+        hints.append("%s %s" % (m.group(1), m.group(2)))
+    for m in _MD.finditer(text):
+        hints.append("%s %s" % (m.group(1), m.group(2)))
+    return hints

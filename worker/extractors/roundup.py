@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup, Tag
 
 from worker.extractors.cities import find_cities
 from worker.extractors.dates import find_dates
+from worker.stats import Trace
 
 INDIAN_STATES = {
     "andhra pradesh", "arunachal pradesh", "assam", "bihar", "chhattisgarh", "goa", "gujarat", "haryana", "himachal pradesh",
@@ -64,7 +65,7 @@ def _clean(t: str) -> str:
     return re.sub(r"\s+", " ", html_lib.unescape(t)).strip()
 
 
-def extract_roundup(html: str, base_url: str, today: dt.date) -> List[RoundupEvent]:
+def extract_roundup(html: str, base_url: str, today: dt.date, trace: Optional[Trace] = None) -> List[RoundupEvent]:
     soup = BeautifulSoup(html, "html.parser")
     publisher_host = urlparse(base_url).hostname or ""
     out: List[RoundupEvent] = []
@@ -83,11 +84,17 @@ def extract_roundup(html: str, base_url: str, today: dt.date) -> List[RoundupEve
             continue
         dates = find_dates(_clean(paras[0].get_text(" ")))
         if not dates:
+            if trace is not None:
+                trace.reject("roundup_no_date", name + " | " + _clean(paras[0].get_text(" ")), event_name=name)
             continue
         date = dates[0]
         venue_line = _clean(paras[1].get_text(" "))
         city = city_from_line(venue_line)
-        if not city or date < today - dt.timedelta(days=1):
+        if not city:
+            if trace is not None:
+                trace.reject("roundup_no_city", "%s | %s | %s" % (name, date.isoformat(), venue_line), event_name=name, date_hint=date.isoformat())
+            continue
+        if date < today - dt.timedelta(days=1):
             continue
         link = None
         for p in paras[1:]:

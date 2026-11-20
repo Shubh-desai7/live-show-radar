@@ -19,6 +19,7 @@ from worker.extractors.cities import find_cities
 from worker.extractors.dates import find_dates_relative
 from worker.extractors.feeds import FeedItem
 from worker.matching.artists import match_artists_detailed
+from worker.stats import Trace
 
 MAX_AGE_DAYS = 60
 _SHOW = re.compile(r"\b(concert|tour|live in|gig|show|perform\w*|headlin\w*|festival|set to|to play|tickets?|presale|pre-sale|dates)\b", re.IGNORECASE)
@@ -39,7 +40,7 @@ def _plain(text: str) -> str:
     return re.sub(r"\s+", " ", BeautifulSoup(html_lib.unescape(text or ""), "html.parser").get_text(" ")).strip()
 
 
-def candidate_from_item(item: FeedItem, artist: Dict[str, str], now: dt.datetime) -> Optional[NewsCandidate]:
+def candidate_from_item(item: FeedItem, artist: Dict[str, str], now: dt.datetime, trace: Optional[Trace] = None) -> Optional[NewsCandidate]:
     if item.published is None or (now - item.published).days > MAX_AGE_DAYS or item.published > now + dt.timedelta(days=1):
         return None
     title = _plain(item.title)
@@ -53,6 +54,11 @@ def candidate_from_item(item: FeedItem, artist: Dict[str, str], now: dt.datetime
     cities = find_cities(text)
     dates = find_dates_relative(text, item.published.date())
     if len(cities) != 1 or len(dates) != 1:
+        if trace is not None:                         # the artist IS in the headline and it is about a show: keep the partial candidate
+            reason = ("news_multiple_cities" if len(cities) > 1 else "news_no_city" if not cities else
+                      "news_multiple_dates" if len(dates) > 1 else "news_no_date")
+            trace.reject(reason, title, artist_hint=artist["artist_name"], event_name=title[:200],
+                         city_hint=", ".join(cities) or None, date_hint=", ".join(d.isoformat() for d in dates) or None)
         return None                                   # ambiguous or incomplete: skip rather than guess
     if dates[0] < now.date() - dt.timedelta(days=1):
         return None

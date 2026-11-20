@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 from worker.extractors.cities import find_cities
 from worker.extractors.html_events import Candidate
 from worker.extractors.tickets import GENERAL_SALE, IST, PRESALE_OPENING, Moment, TicketInfo
+from worker.stats import Trace
 
 MAX_EVENTS = 200
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
@@ -153,7 +154,7 @@ def _offers(ev: Dict[str, Any], base_url: str):
     return info, url
 
 
-def extract_jsonld_events(html: str, base_url: str) -> List[Candidate]:
+def extract_jsonld_events(html: str, base_url: str, trace: Optional[Trace] = None) -> List[Candidate]:
     out: List[Candidate] = []
     seen = set()
     for block in _blocks(html):
@@ -162,11 +163,23 @@ def extract_jsonld_events(html: str, base_url: str) -> List[Candidate]:
                 continue
             attendance = str(node.get("eventAttendanceMode", ""))
             if attendance.endswith("OnlineEventAttendanceMode"):
+                if trace is not None:
+                    trace.reject("online_event", _clean(node.get("name")) or "", event_name=_clean(node.get("name")))
                 continue
             date = _start_date(node.get("startDate"))
             loc = _location(node)
             cities = find_cities(loc["haystack"] or "")
+            if not cities:
+                # Location names only a country ("India"): the event's own title may state the city explicitly
+                # (e.g. "Sunburn Arena ft. DJ Snake – Bangalore"). Exactly one recognised city is required.
+                cities = find_cities(_clean(node.get("name")) or "")
             if not date or len(cities) != 1:
+                if trace is not None:
+                    name = _clean(node.get("name"))
+                    where = (loc["haystack"] or "").strip()[:120]
+                    reason = "no_date" if not date else ("multiple_cities" if cities else ("city_not_recognised" if where else "no_city"))
+                    trace.reject(reason, "%s | %s | %s" % (name, node.get("startDate"), where), event_name=name,
+                                 city_hint=where or None, date_hint=str(node.get("startDate") or "")[:40] or None, venue=loc["venue"])
                 continue                                # unknown/ambiguous city or date: skip rather than guess
             key = (cities[0], date, (_name_of(node.get("name")) or "").lower())
             if key in seen:

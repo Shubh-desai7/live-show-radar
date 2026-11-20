@@ -32,6 +32,43 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", t).strip()
 
 
+def collapse_initials(norm: str) -> str:
+    """'a r rahman' -> 'ar rahman' so 'A. R. Rahman', 'A.R. Rahman' and 'AR Rahman' are one name."""
+    out: List[str] = []
+    run = ""
+    for tok in norm.split():
+        if len(tok) == 1 and tok.isalpha():
+            run += tok
+            continue
+        if run:
+            out.append(run)
+            run = ""
+        out.append(tok)
+    if run:
+        out.append(run)
+    return " ".join(out)
+
+
+def name_variants(artist: Dict) -> List[str]:
+    """Normalised spellings to look for: the name, initials collapsed, a dropped leading 'The' (only when what is
+    left is distinctive) and any explicit aliases stored in artists.metadata.aliases."""
+    names = [artist["artist_name"]]
+    meta = artist.get("metadata")
+    if isinstance(meta, dict) and isinstance(meta.get("aliases"), list):
+        names += [a for a in meta["aliases"] if isinstance(a, str)]
+    variants: List[str] = []
+    for n in names:
+        norm = normalize(n)
+        for v in (norm, collapse_initials(norm)):
+            if v and v not in variants:
+                variants.append(v)
+        toks = norm.split()
+        if len(toks) == 2 and toks[0] == "the" and len(toks[1]) >= 5 and toks[1] not in COMMON_WORDS:
+            if toks[1] not in variants:
+                variants.append(toks[1])
+    return variants
+
+
 def is_ambiguous_name(name: str) -> bool:
     n = normalize(name)
     if n in AMBIGUOUS_PHRASES:
@@ -49,14 +86,12 @@ class Match:
 
 
 def match_artists_detailed(text: str, artists: List[Dict[str, str]]) -> List[Match]:
-    haystack = " " + normalize(text) + " "
+    norm_text = normalize(text)
+    haystack = " " + norm_text + " " + collapse_initials(norm_text) + " "
     has_context = bool(CONTEXT.search(text))
     hits: List[Match] = []
     for a in artists:
-        needle = normalize(a["artist_name"])
-        if len(needle) < 3:
-            continue
-        if (" " + needle + " ") not in haystack:
+        if not any(len(v) >= 3 and (" " + v + " ") in haystack for v in name_variants(a)):
             continue
         ambiguous = is_ambiguous_name(a["artist_name"])
         if ambiguous and not has_context:

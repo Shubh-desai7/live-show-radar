@@ -8,6 +8,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -17,6 +18,7 @@ from worker.extractors.page import extract_all
 from worker.extractors.roundup import act_name
 from worker.extractors.tickets import drop_late_moments, extract_ticket_info
 from worker.matching.artists import Match, match_artists_detailed
+from worker.stats import RunReport, SourceResult, Trace
 from worker.verification.classify import CONFIRMED, RANK, RUMOURED, classify, is_upgrade
 from worker.verification.tickets import merge_tickets
 
@@ -44,8 +46,10 @@ def _empty_stats() -> Dict[str, int]:
 
 def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False,
         limit: int = config.DEFAULT_SOURCE_LIMIT, catalog_limit: int = config.DEFAULT_CATALOG_LIMIT,
-        on_change: Optional[Callable[[EventChange], None]] = None) -> Dict[str, int]:
+        on_change: Optional[Callable[[EventChange], None]] = None, report: Optional[RunReport] = None) -> Dict[str, int]:
     stats = _empty_stats()
+    report = report if report is not None else RunReport()
+    cnt = report.counters
     tracked_ids = repo.tracked_artist_ids()
     artists: List[Dict[str, Any]] = repo.catalog_artists(tracked_ids)      # followed artists + the whole catalog
     if not artists:
@@ -81,8 +85,14 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
 
     for src in repo.sources_to_check(HTML_SOURCE_TYPES, tracked_ids, stamp, limit, catalog_limit):
         stats["sources"] += 1
+        cnt["sources_attempted"] += 1
+        t0 = time.monotonic()
         result = fetcher.fetch(src["source_url"])
+        sres = SourceResult(src["source_id"], src["source_url"], result.status, result.detail)
+        report.source_results.append(sres)
         if result.status != OK:
+            cnt["sources_blocked" if result.status in ("blocked", "robots_disallowed") else "sources_failed"] += 1
+            sres.duration_ms = int((time.monotonic() - t0) * 1000)
             stats["failed"] += 1
             log.warning("%s -> %s (%s)", src["source_url"], result.status, result.detail)
             if not dry_run:
@@ -91,18 +101,28 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
             continue
 
         ref = "sha256:" + hashlib.sha256(result.text.encode("utf-8")).hexdigest() + "|v" + config.EXTRACTOR_VERSION
+        cnt["sources_fetched"] += 1
         if repo.last_content_ref(src["source_id"]) == ref:
             stats["unchanged"] += 1
+            cnt["sources_unchanged"] += 1
+            sres.status = "unchanged"
+            sres.duration_ms = int((time.monotonic() - t0) * 1000)
             if not dry_run:
                 repo.touch_verified(src["source_id"], stamp)
                 repo.update_source(src["source_id"], "ok", stamp)
             continue
 
-        for cand in extract_all(result.text, result.url, official_owner=bool(src.get("artist_id"))):
+        cnt["sources_new_content"] += 1
+        trace = Trace()
+        for cand in extract_all(result.text, result.url, official_owner=bool(src.get("artist_id")), trace=trace):
+            cnt["candidates_raw"] += 1
             if cand.event_date < (now - dt.timedelta(days=1)).date().isoformat():
                 stats["past_skipped"] += 1             # never create or alert on shows that already happened
+                trace.reject("past_date", cand.snippet, event_name=cand.event_name, city_hint=cand.city, date_hint=cand.event_date)
                 continue
             stats["candidates"] += 1
+            cnt["candidates_extracted"] += 1
+            sres.candidates += 1
             if src.get("artist_id"):
                 owners = [Match(by_id[src["artist_id"]], False)] if src["artist_id"] in by_id else []
                 owner_source = True
@@ -114,6 +134,10 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                     if act_id:
                         owners = [Match({"artist_id": act_id, "artist_name": act_name(cand.event_name)}, False)]
 
+            if not owners:                            # a real, complete event that no artist could be attached to: keep it
+                trace.reject("no_artist_match", cand.snippet, stage="matching", event_name=cand.event_name, city_hint=cand.city,
+                             date_hint=cand.event_date, venue=cand.venue, booking_url=cand.booking_url)
+            cnt["artist_matches"] += len(owners)
             for m in owners:
                 artist_id = m.artist["artist_id"]
                 confidence = classify(src["source_type"], owner_source=owner_source, ambiguous_name=m.ambiguous)
@@ -121,6 +145,8 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
 
                 if existing is None:
                     if cand.status != "scheduled":
+                        trace.reject("status_notice_untracked", cand.snippet, stage="verification", city_hint=cand.city, date_hint=cand.event_date,
+                                     artist_hint=m.artist["artist_name"])
                         continue                 # a cancellation notice for a show we never tracked
                     log.info("new %s: %s | %s | %s", confidence, m.artist["artist_name"], cand.city, cand.event_date)
                     if dry_run:
@@ -134,12 +160,15 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                         "last_verified_at": stamp if confidence != RUMOURED else None,
                     })
                     stats["events_new" if created else "events_existing"] += 1
+                    cnt["events_created_" + confidence if created else "duplicates_ignored"] += 1
+                    sres.events_new += 1 if created else 0
                     if created:
                         emit("new_event", created["event_id"], artist_id, cand, confidence, "scheduled")
                         save_tickets(created["event_id"], cand, confidence, confidence)
                     continue
 
                 stats["events_existing"] += 1
+                cnt["duplicates_ignored"] += 1
                 updates: Dict[str, Any] = {}
                 new_conf = existing["confidence"]
                 if is_upgrade(existing["confidence"], confidence):
@@ -160,6 +189,8 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                     stats["events_status_changed"] += 1
                 if updates and not dry_run:
                     repo.update_event(existing["event_id"], updates)
+                    if set(updates) - {"last_verified_at"}:
+                        cnt["events_updated"] += 1
                 if not dry_run and existing["status"] != "cancelled" and not status_changed:
                     save_tickets(existing["event_id"], cand, confidence, new_conf)
                 if status_changed:
@@ -167,6 +198,8 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                 elif "confidence" in updates and new_conf == CONFIRMED:
                     emit("confirmed", existing["event_id"], artist_id, cand, new_conf, existing["status"])
 
+        sres.rejected = report.add_rejections(src["source_id"], trace)
+        sres.duration_ms = int((time.monotonic() - t0) * 1000)
         if not dry_run:
             repo.insert_log(src["source_id"], src["source_url"], ref, "processed")
             repo.update_source(src["source_id"], "ok", stamp)

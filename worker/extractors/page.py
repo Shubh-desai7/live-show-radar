@@ -1,18 +1,19 @@
 """All extractors for one page: structured JSON-LD events first, then text-derived blocks for what remains."""
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from worker.extractors.html_events import Candidate, extract_candidates
 from worker.extractors.jsonld import extract_jsonld_events
 from worker.extractors.links import unique_india_ticket_link
+from worker.stats import Trace
 
 
-def extract_all(html: str, base_url: str, official_owner: bool = False) -> List[Candidate]:
-    structured = extract_jsonld_events(html, base_url)
+def extract_all(html: str, base_url: str, official_owner: bool = False, trace: Optional[Trace] = None) -> List[Candidate]:
+    structured = extract_jsonld_events(html, base_url, trace)
     merged = list(structured)
     by_key = {(c.city, c.event_date): c for c in structured}
-    for c in extract_candidates(html, base_url):
+    for c in extract_candidates(html, base_url, trace):
         existing = by_key.get((c.city, c.event_date))
         if existing is None:
             merged.append(c)

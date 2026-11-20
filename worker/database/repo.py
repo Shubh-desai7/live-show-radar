@@ -167,11 +167,11 @@ class Repo:
 
     def catalog_artists(self, tracked_ids: List[str]) -> List[Dict[str, Any]]:
         """Every featured (catalog) artist plus any followed artist: the set shows are matched against."""
-        rows = self.db.select("artists", {"select": "artist_id,artist_name,official_website", "featured": "is.true", "limit": "2000"})
+        rows = self.db.select("artists", {"select": "artist_id,artist_name,official_website,metadata", "featured": "is.true", "limit": "2000"})
         have = {r["artist_id"] for r in rows}
         missing = [i for i in tracked_ids if i not in have]
         for chunk in self._chunks(missing):
-            rows += self.db.select("artists", {"select": "artist_id,artist_name,official_website", "artist_id": "in.(%s)" % ",".join(chunk)})
+            rows += self.db.select("artists", {"select": "artist_id,artist_name,official_website,metadata", "artist_id": "in.(%s)" % ",".join(chunk)})
         return rows
 
     def source_urls(self) -> set:
@@ -259,3 +259,53 @@ class Repo:
                 raise
             again = self.db.select("artists", {"select": "artist_id", "artist_name": like, "limit": "1"})
             return again[0]["artist_id"] if again else None
+
+
+    # ------------------------------------------------------------------ monitoring
+    def start_run(self, command: str, trigger: str) -> Optional[str]:
+        row = self.db.insert("discovery_runs", {"command": command, "trigger": trigger})
+        return row["run_id"] if row else None
+
+    def finish_run(self, run_id: str, ok: bool, stats: Dict[str, Any], error: Optional[str] = None) -> None:
+        self.db.update("discovery_runs", {"run_id": "eq." + run_id},
+                       {"finished_at": dt.datetime.now(dt.timezone.utc).isoformat(), "ok": ok, "stats": stats, "error": (error or None)})
+
+    def save_source_results(self, run_id: str, results: List[Any]) -> None:
+        for chunk in self._chunks(list(range(len(results))), 100):
+            rows = [{"run_id": run_id, "source_id": results[i].source_id, "source_url": results[i].source_url[:500],
+                     "status": results[i].status, "detail": (results[i].detail or "")[:200], "candidates": results[i].candidates,
+                     "rejected": results[i].rejected, "events_new": results[i].events_new, "duration_ms": results[i].duration_ms}
+                    for i in chunk]
+            if rows:
+                self.db.insert("discovery_source_results", rows)  # type: ignore[arg-type]
+
+    def save_candidates(self, pairs: List[Any]) -> int:
+        """Keep rejected / incomplete candidates (deduplicated per source+content). Already-known ones just get last_seen_at."""
+        saved = 0
+        by_source: Dict[Optional[str], List[Any]] = {}
+        for source_id, r in pairs:
+            by_source.setdefault(source_id, []).append(r)
+        for source_id, items in by_source.items():
+            if source_id is None:
+                continue
+            known = {x["content_key"] for x in self.db.select("event_candidates", {"select": "content_key", "source_id": "eq." + source_id, "limit": "2000"})}
+            fresh, seen_keys = [], []
+            for r in items:
+                (seen_keys if r.key() in known else fresh).append(r)
+            if seen_keys:
+                self.db.update("event_candidates", {"source_id": "eq." + source_id, "content_key": "in.(%s)" % ",".join(r.key() for r in seen_keys)},
+                               {"last_seen_at": dt.datetime.now(dt.timezone.utc).isoformat()})
+            rows = [{"source_id": source_id, "stage": r.stage, "reason": r.reason, "detail": r.detail[:200] or None, "artist_hint": r.artist_hint,
+                     "event_name": (r.event_name or "")[:200] or None, "city_hint": (r.city_hint or "")[:120] or None,
+                     "date_hint": (r.date_hint or "")[:60] or None, "venue": (r.venue or "")[:200] or None, "booking_url": r.booking_url,
+                     "snippet": r.snippet[:300] or None, "content_key": r.key()} for r in fresh]
+            seen_new = set()
+            rows = [x for x in rows if not (x["content_key"] in seen_new or seen_new.add(x["content_key"]))]
+            if rows:
+                self.db.insert("event_candidates", rows)  # type: ignore[arg-type]
+                saved += len(rows)
+        return saved
+
+    def prune_monitoring(self, now: dt.datetime) -> None:
+        self.db.delete_where("discovery_runs", {"started_at": "lt." + (now - dt.timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")})
+        self.db.delete_where("event_candidates", {"last_seen_at": "lt." + (now - dt.timedelta(days=45)).strftime("%Y-%m-%dT%H:%M:%SZ")})

@@ -31,7 +31,7 @@ class SupabaseRest:
     def select(self, table: str, params: Dict[str, str]) -> List[Dict[str, Any]]:
         return self._check(self.session.get(self.base + table, params=params, timeout=30)).json()
 
-    def insert(self, table: str, row: Dict[str, Any], *, ignore_duplicates: bool = False,
+    def insert(self, table: str, row: Any, *, ignore_duplicates: bool = False,
                merge_duplicates: bool = False, on_conflict: Optional[str] = None) -> Optional[Dict[str, Any]]:
         prefer = "return=representation"
         params: Dict[str, str] = {}
@@ -43,6 +43,9 @@ class SupabaseRest:
                                              headers={"Prefer": prefer}, timeout=30))
         rows = resp.json()
         return rows[0] if rows else None
+
+    def delete_where(self, table: str, match: Dict[str, str]) -> None:
+        self._check(self.session.delete(self.base + table, params=match, timeout=30))
 
     def update(self, table: str, match: Dict[str, str], values: Dict[str, Any]) -> None:
         self._check(self.session.patch(self.base + table, params=match, json=values, timeout=30))

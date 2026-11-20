@@ -14,7 +14,8 @@ def test_cities_normalise_aliases_and_dedupe():
 
 
 def test_cities_need_word_boundaries():
-    assert find_cities("Panjim, Pune") == ["Pune"]
+    assert find_cities("Panjim, Pune") == ["Goa", "Pune"]            # Panjim is in Goa (added deliberately)
+    assert find_cities("Punecha Mumbaikar") == []
     assert find_cities("Goatee festival") == []
 
 
