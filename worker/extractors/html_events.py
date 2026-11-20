@@ -6,7 +6,7 @@ Venue is left unset: guessing it from free text would risk inventing information
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 from urllib.parse import urljoin, urlparse
 
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup, Tag
 
 from worker.extractors.cities import find_cities
 from worker.extractors.dates import find_dates
-from worker.extractors.tickets import blank_ticket_dates
+from worker.extractors.tickets import TicketInfo, blank_ticket_dates
 
 _BLOCK_TAGS = ("article", "li", "tr", "section")
 _EVENT_CLASS = re.compile(r"event|show|tour|gig|concert|date", re.IGNORECASE)
@@ -43,6 +43,10 @@ class Candidate:
     booking_url: Optional[str] = None
     status: str = "scheduled"
     text: str = ""                  # full block text (<= MAX_LEN), used for ticket extraction
+    venue: Optional[str] = None     # only from structured data (never guessed from free text)
+    event_name: Optional[str] = None
+    performers: List[str] = field(default_factory=list)
+    tickets: Optional[TicketInfo] = None   # precomputed from structured offers, if any
 
 
 def _block_text(el: Tag) -> str:

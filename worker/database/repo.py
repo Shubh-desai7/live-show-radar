@@ -48,7 +48,7 @@ class Repo:
 
     def find_event(self, artist_id: str, city: str, event_date: str) -> Optional[Dict[str, Any]]:
         rows = self.db.select("events", {
-            "select": "event_id,confidence,status,source_id,booking_url", "artist_id": "eq." + artist_id,
+            "select": "event_id,confidence,status,source_id,booking_url,venue,event_name", "artist_id": "eq." + artist_id,
             "city": "ilike." + city.replace("%", "").replace("_", "\\_"),
             "event_date": "eq." + event_date, "limit": "1",
         })

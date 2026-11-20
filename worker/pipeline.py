@@ -13,8 +13,8 @@ from typing import Any, Callable, Dict, List, Optional
 
 from worker import config
 from worker.collectors.http import OK, PoliteFetcher
-from worker.extractors.html_events import extract_candidates
-from worker.extractors.tickets import extract_ticket_info
+from worker.extractors.page import extract_all
+from worker.extractors.tickets import drop_late_moments, extract_ticket_info
 from worker.matching.artists import Match, match_artists_detailed
 from worker.verification.classify import CONFIRMED, RANK, RUMOURED, classify, is_upgrade
 from worker.verification.tickets import merge_tickets
@@ -38,7 +38,7 @@ class EventChange:
 
 def _empty_stats() -> Dict[str, int]:
     return {"sources": 0, "unchanged": 0, "failed": 0, "candidates": 0, "events_new": 0,
-            "events_existing": 0, "events_upgraded": 0, "events_status_changed": 0, "tickets_saved": 0}
+            "events_existing": 0, "events_upgraded": 0, "events_status_changed": 0, "tickets_saved": 0, "past_skipped": 0}
 
 
 def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False,
@@ -60,7 +60,7 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
         """Ticket info only comes from non-rumoured sources and never from one weaker than the event's own."""
         if confidence == RUMOURED or RANK[confidence] < RANK[event_confidence]:
             return
-        info = extract_ticket_info(cand.text, cand.event_date)
+        info = drop_late_moments(cand.tickets, cand.event_date) if cand.tickets else extract_ticket_info(cand.text, cand.event_date)
         if info.is_empty() and not cand.booking_url:
             return
         row = merge_tickets(repo.get_ticket(event_id) if event_id else None, info, cand.booking_url,
@@ -95,7 +95,10 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                 repo.update_source(src["source_id"], "ok", stamp)
             continue
 
-        for cand in extract_candidates(result.text, result.url):
+        for cand in extract_all(result.text, result.url):
+            if cand.event_date < (now - dt.timedelta(days=1)).date().isoformat():
+                stats["past_skipped"] += 1             # never create or alert on shows that already happened
+                continue
             stats["candidates"] += 1
             if src.get("artist_id"):
                 owners = [Match(by_id[src["artist_id"]], False)] if src["artist_id"] in by_id else []
@@ -118,7 +121,7 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                         continue
                     created = repo.insert_event({
                         "artist_id": artist_id, "city": cand.city, "event_date": cand.event_date,
-                        "booking_url": cand.booking_url, "source_id": src["source_id"],
+                        "venue": cand.venue, "event_name": cand.event_name, "booking_url": cand.booking_url, "source_id": src["source_id"],
                         "confidence": confidence, "status": "scheduled",
                         "first_seen_at": stamp, "detected_at": stamp,
                         "last_verified_at": stamp if confidence != RUMOURED else None,
@@ -138,8 +141,10 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                     stats["events_upgraded"] += 1
                 if RANK[confidence] > 0:
                     updates["last_verified_at"] = stamp
-                if not existing.get("booking_url") and cand.booking_url and RANK[confidence] >= RANK[CONFIRMED]:
-                    updates["booking_url"] = cand.booking_url
+                if RANK[confidence] >= RANK[CONFIRMED]:           # official sources may fill in details we lack
+                    for column, value in (("booking_url", cand.booking_url), ("venue", cand.venue), ("event_name", cand.event_name)):
+                        if value and not existing.get(column):
+                            updates[column] = value
                 # Only an official source may cancel or postpone.
                 status_changed = (confidence == CONFIRMED and cand.status != "scheduled"
                                   and existing["status"] != cand.status)

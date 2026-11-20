@@ -186,3 +186,52 @@ def test_wording_dropped_from_page_does_not_erase_known_dates():
     run(repo, page(SALE), now=NOW)
     run(repo, page('<ul><li class="show">Sat 20 Dec 2026 Bengaluru. Tickets: see link</li></ul>'), now=LATER)
     assert repo.tickets["e1"]["general_sale_opening"] == "2026-12-08T12:30:00+00:00"
+
+
+import json as _json
+
+LD_EVENT = {"@type": "MusicEvent", "name": "Band Live", "startDate": "2027-01-19T20:00:00+05:30",
+            "location": {"name": "Palace Grounds", "address": {"addressLocality": "Bangalore"}},
+            "performer": {"name": "Band"},
+            "offers": {"url": "/tickets", "validFrom": "2026-12-08T18:00:00+05:30"}}
+
+
+def ld_page(*events):
+    return "".join('<script type="application/ld+json">%s</script>' % _json.dumps(e) for e in events)
+
+
+def test_structured_event_saves_venue_name_and_exact_sale_time_as_reliable():
+    repo = FakeRepo([ARTIST], [OWN])
+    stats = run(repo, page(ld_page(LD_EVENT)), now=NOW)
+    ev = repo.events[0]
+    assert (ev["venue"], ev["event_name"], ev["city"], ev["confidence"]) == ("Palace Grounds", "Band Live", "Bengaluru", "confirmed")
+    t = repo.tickets["e1"]
+    assert t["general_sale_opening"] == "2026-12-08T12:30:00+00:00" and t["timing_reliable"] is True
+    assert t["booking_url"] == "https://band.example/tickets" and stats["tickets_saved"] == 1
+
+
+def test_past_shows_are_never_created_or_alerted():
+    old = dict(LD_EVENT, startDate="2026-06-01T20:00:00+05:30")
+    repo = FakeRepo([ARTIST], [OWN])
+    changes = []
+    stats = run(repo, page(ld_page(old)), now=NOW, on_change=changes.append)
+    assert repo.events == [] and changes == [] and stats["past_skipped"] == 1
+
+
+def test_promoter_structured_event_is_matched_to_the_followed_artist_by_performer():
+    nucleya = {"artist_id": "a3", "artist_name": "Nucleya", "official_website": None}
+    mine = dict(LD_EVENT, name="Bass Night", performer=[{"name": "Nucleya"}, {"name": "Someone Else"}])
+    other = dict(LD_EVENT, name="Jazz Night", startDate="2027-01-20T20:00:00+05:30", performer={"name": "Other Act"})
+    repo = FakeRepo([nucleya], [PROMO])
+    run(repo, page(ld_page(mine, other), PROMO["source_url"]), now=NOW)
+    assert [(e["artist_id"], e["event_name"]) for e in repo.events] == [("a3", "Bass Night")]
+
+
+def test_official_site_fills_in_missing_venue_on_an_existing_event():
+    repo = FakeRepo([ARTIST], [OWN])
+    repo.events.append({"event_id": "e0", "artist_id": "a1", "city": "Bengaluru", "event_date": "2027-01-19",
+                        "confidence": "confirmed", "status": "scheduled", "source_id": "s1", "booking_url": None,
+                        "venue": None, "event_name": None})
+    run(repo, page(ld_page(LD_EVENT)), now=NOW)
+    ev = repo.events[0]
+    assert (ev["venue"], ev["event_name"]) == ("Palace Grounds", "Band Live")

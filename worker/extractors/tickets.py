@@ -158,3 +158,10 @@ def blank_ticket_dates(text: str) -> str:
             for j in range(end + s0, end + e0):
                 chars[j] = " "
     return "".join(chars)
+
+
+def drop_late_moments(info: TicketInfo, event_date: Optional[str]) -> TicketInfo:
+    """Remove moments on/after the show date (a misread, same rule as the text extractor)."""
+    if event_date:
+        info.moments = {k: m for k, m in info.moments.items() if m.at.astimezone(IST).date().isoformat() < event_date}
+    return info
