@@ -56,7 +56,7 @@ async function Body({ id }: { id: string }) {
           <span className="text-sm text-mist">Opens {safeHost(link)}, the link published by the official source. You buy there; we don&apos;t sell tickets.</span>
         </div>
       ) : (
-        <p className="rounded-2xl border border-dashed border-line p-4 text-mist">No booking link has been published yet. We&apos;ll message you if one appears.</p>
+        <p className="rounded-2xl border border-dashed border-line p-4 text-mist">{confidence === "confirmed" ? "No booking link has been published yet. We\u2019ll message you if one appears." : "No booking link yet. This is a news report, not an official announcement; look for the official page before you book."}</p>
       ))}
       {stale && (
         <p className="max-w-2xl rounded-2xl border-2 border-ember p-4 font-semibold text-ember">

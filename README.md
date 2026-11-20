@@ -42,3 +42,5 @@ A curated catalog of 500+ well-known artists (India and world) can be browsed A 
 
 ## How shows are found
 A worker runs every ~30 minutes (GitHub Actions, best effort): it discovers and verifies artists' official sites (MusicBrainz + a name check), re-reads their tour pages and promoter pages, and updates shows, official booking links and ticket dates. Not every artist has a readable page, so coverage is partial; the dashboard shows what is being checked. Telegram alerts include the official booking link.
+
+News feeds: the worker also reads a few Indian music-news RSS feeds that allow automated readers. Shows found only in headlines are marked Unconfirmed, never trigger alerts, and are upgraded when an official source lists them.
