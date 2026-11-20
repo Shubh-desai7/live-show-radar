@@ -34,11 +34,14 @@ jobs:
       - run: npm run build
 
   worker:
-    runs-on: ubuntu-latest
+    # 3.9 matches the development machine (and needs an older image); 3.12 is what the scheduled workers use.
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 10
     strategy:
       matrix:
-        python-version: ["3.9", "3.12"]
+        include:
+          - { os: ubuntu-22.04, python-version: "3.9" }
+          - { os: ubuntu-latest, python-version: "3.12" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
