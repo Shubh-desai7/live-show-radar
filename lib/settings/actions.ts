@@ -33,3 +33,22 @@ export async function savePreferences(_: SettingsState, formData: FormData): Pro
   revalidatePath("/", "layout");
   return { message: "Saved." };
 }
+
+
+/** Replace the user's tracked cities with exactly this list (validated against the supported cities). */
+export async function saveCities(cities: string[]): Promise<{ error?: string }> {
+  const wanted = [...new Set(cities)];
+  if (wanted.some((c) => !isKnownCity(c))) return { error: "Unknown city." };
+  const { supabase, user } = await requireUser();
+  if (wanted.length) {
+    const { error } = await supabase.from("user_cities")
+      .upsert(wanted.map((city) => ({ user_id: user.id, city, country: "India" })), { onConflict: "user_id,city,country", ignoreDuplicates: true });
+    if (error) return { error: "Couldn't save your cities. Try again." };
+  }
+  let del = supabase.from("user_cities").delete().eq("user_id", user.id);
+  if (wanted.length) del = del.not("city", "in", `(${wanted.map((c) => `"${c}"`).join(",")})`);
+  const { error } = await del;
+  if (error) return { error: "Couldn't update your cities. Try again." };
+  revalidatePath("/", "layout");
+  return {};
+}

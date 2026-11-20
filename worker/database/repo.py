@@ -1,6 +1,7 @@
 """Worker-facing data access. The pipeline only talks to this interface (easy to fake in tests)."""
 from __future__ import annotations
 
+import datetime as dt
 from typing import Any, Dict, Iterable, List, Optional
 
 from worker.database.client import DatabaseError, SupabaseRest
@@ -23,17 +24,6 @@ class Repo:
     def ensure_source(self, source_type: str, source_url: str, artist_id: Optional[str]) -> None:
         self.db.insert("sources", {"source_type": source_type, "source_url": source_url, "artist_id": artist_id},
                        ignore_duplicates=True, on_conflict="source_url")
-
-    def sources_to_check(self, types: Iterable[str], artist_ids: List[str], limit: int) -> List[Dict[str, Any]]:
-        ids = ",".join(artist_ids)
-        scope = "artist_id.is.null" + (",artist_id.in.(%s)" % ids if ids else "")
-        return self.db.select("sources", {
-            "select": "source_id,source_type,source_url,artist_id,access_status,last_checked_at",
-            "source_type": "in.(%s)" % ",".join(types),
-            "or": "(%s)" % scope,
-            "order": "last_checked_at.asc.nullsfirst",
-            "limit": str(limit),
-        })
 
     def last_content_ref(self, source_id: str) -> Optional[str]:
         rows = self.db.select("raw_source_logs", {
@@ -170,3 +160,69 @@ class Repo:
 
     def unlink_chat(self, user_id: str) -> None:
         self.db.update("profiles", {"user_id": "eq." + user_id}, {"telegram_chat_id": None})
+
+    # ------------------------------------------------------------------ catalog + site discovery
+    def tracked_artist_ids(self) -> List[str]:
+        return sorted({r["artist_id"] for r in self.db.select("user_artists", {"select": "artist_id"})})
+
+    def catalog_artists(self, tracked_ids: List[str]) -> List[Dict[str, Any]]:
+        """Every featured (catalog) artist plus any followed artist: the set shows are matched against."""
+        rows = self.db.select("artists", {"select": "artist_id,artist_name,official_website", "featured": "is.true", "limit": "2000"})
+        have = {r["artist_id"] for r in rows}
+        missing = [i for i in tracked_ids if i not in have]
+        for chunk in self._chunks(missing):
+            rows += self.db.select("artists", {"select": "artist_id,artist_name,official_website", "artist_id": "in.(%s)" % ",".join(chunk)})
+        return rows
+
+    def source_urls(self) -> set:
+        return {r["source_url"] for r in self.db.select("sources", {"select": "source_url", "limit": "5000"})}
+
+    def sources_to_check(self, types: Iterable[str], tracked_ids: List[str], now_iso: str, tier1_limit: int,
+                         tier2_limit: int, recheck_minutes: int = 25) -> List[Dict[str, Any]]:
+        """Tier 1: promoter pages and followed artists' pages, at most every `recheck_minutes`.
+        Tier 2: other catalog artists' pages, at most daily, a few per run (so catalog shows are already fetched when someone follows)."""
+        now = dt.datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+        fresh_after = (now - dt.timedelta(minutes=recheck_minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        daily_after = (now - dt.timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        cols = "source_id,source_type,source_url,artist_id,access_status,last_checked_at"
+        scope = "artist_id.is.null" + (",artist_id.in.(%s)" % ",".join(tracked_ids) if tracked_ids else "")
+        t1 = self.db.select("sources", {
+            "select": cols, "source_type": "in.(%s)" % ",".join(types),
+            "and": "(or(%s),or(last_checked_at.is.null,last_checked_at.lt.%s))" % (scope, fresh_after),
+            "order": "last_checked_at.asc.nullsfirst", "limit": str(tier1_limit)})
+        params = {"select": cols, "source_type": "in.(%s)" % ",".join(types), "artist_id": "not.is.null",
+                  "or": "(last_checked_at.is.null,last_checked_at.lt.%s)" % daily_after,
+                  "order": "last_checked_at.asc.nullsfirst", "limit": str(tier2_limit)}
+        if tracked_ids:
+            params["artist_id"] = "not.in.(%s)" % ",".join(tracked_ids)
+        t2 = self.db.select("sources", params) if tier2_limit > 0 else []
+        seen = {s["source_id"] for s in t1}
+        return t1 + [s for s in t2 if s["source_id"] not in seen]
+
+    def artists_needing_site(self, tracked_ids: List[str], now_z: str, limit_tracked: int, limit_catalog: int) -> List[Dict[str, Any]]:
+        """Artists with no official site on file whose discovery is not waiting out a retry window. Followed artists first."""
+        retry = "(metadata->>site_retry_after.is.null,metadata->>site_retry_after.lt.%s)" % now_z
+        out: List[Dict[str, Any]] = []
+        if tracked_ids and limit_tracked > 0:
+            out += self.db.select("artists", {"select": "artist_id,artist_name,metadata", "official_website": "is.null",
+                                              "artist_id": "in.(%s)" % ",".join(tracked_ids), "or": retry, "limit": str(limit_tracked)})
+        if limit_catalog > 0:
+            params = {"select": "artist_id,artist_name,metadata", "official_website": "is.null", "featured": "is.true",
+                      "or": retry, "order": "featured_rank.asc.nullslast", "limit": str(limit_catalog)}
+            if tracked_ids:
+                params["artist_id"] = "not.in.(%s)" % ",".join(tracked_ids)
+            out += self.db.select("artists", params)
+        return out
+
+    def save_site_result(self, artist: Dict[str, Any], d, now: dt.datetime) -> None:
+        meta = dict(artist.get("metadata") or {})
+        meta.update(site_status=d.status, site_detail=(d.detail or "")[:120],
+                    site_checked_at=now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    site_retry_after=(now + dt.timedelta(days=d.retry_days)).strftime("%Y-%m-%dT%H:%M:%SZ"))
+        values: Dict[str, Any] = {"metadata": meta}
+        if d.status == "ok":
+            values["official_website"] = d.official_url
+        self.db.update("artists", {"artist_id": "eq." + artist["artist_id"]}, values)
+        if d.status == "ok":
+            for url in d.source_urls:
+                self.ensure_source("artist_website", url, artist["artist_id"])

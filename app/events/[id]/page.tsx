@@ -9,6 +9,10 @@ import { loadEvent } from "@/lib/events/queries";
 import { toVisible } from "@/lib/events/status";
 import { loadUserSetup } from "@/lib/settings/queries";
 
+function safeHost(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "the official site"; }
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const earlyBird = { available: "Early-bird tickets available", ended: "Early-bird has ended", not_offered: "No early-bird tier", unknown: "Early-bird status unknown" } as const;
 const explain = {
@@ -25,6 +29,7 @@ async function Body({ id }: { id: string }) {
   const t = event.tickets;
   const link = t?.booking_url ?? event.booking_url;
   const now = new Date();
+  const stale = !!event.last_verified_at && now.getTime() - new Date(event.last_verified_at).getTime() > 48 * 3_600_000 && event.status === "scheduled";
   const future = new Set(upcomingDeadlines(t, now).map((d) => d.kind));
 
   const rows: [DeadlineKind, string | null | undefined][] = [
@@ -41,6 +46,23 @@ async function Body({ id }: { id: string }) {
         {event.status !== "scheduled" && <span className="rounded-md bg-hotpink px-2 py-1 text-xs font-extrabold uppercase text-ink">{event.status}</span>}
       </div>
       <p className="max-w-2xl text-lg text-mist">{explain[confidence]}</p>
+
+      {event.status === "scheduled" && (link ? (
+        <div className="flex flex-col gap-1">
+          <a href={link} target="_blank" rel="noopener noreferrer"
+            className="flex w-fit items-center gap-2 rounded-full bg-volt px-8 py-4 text-lg font-extrabold text-ink">
+            Official booking link <ExternalLink aria-hidden className="size-5" />
+          </a>
+          <span className="text-sm text-mist">Opens {safeHost(link)}, the link published by the official source. You buy there; we don&apos;t sell tickets.</span>
+        </div>
+      ) : (
+        <p className="rounded-2xl border border-dashed border-line p-4 text-mist">No booking link has been published yet. We&apos;ll message you if one appears.</p>
+      ))}
+      {stale && (
+        <p className="max-w-2xl rounded-2xl border-2 border-ember p-4 font-semibold text-ember">
+          We haven&apos;t re-confirmed this show on the official page since {formatDateTime(event.last_verified_at!, timezone)}. Check the official page before you book.
+        </p>
+      )}
 
       <Section title="The show">
         <dl className="grid gap-3 sm:grid-cols-3">
@@ -66,11 +88,6 @@ async function Body({ id }: { id: string }) {
           <p className="text-sm font-semibold text-ember">These dates or times aren&apos;t verified, so we won&apos;t send reminders for them. Check the official page.</p>
         )}
         <p className="text-sm text-mist">{earlyBird[t?.early_bird_status ?? "unknown"]}</p>
-        {link && (
-          <a href={link} target="_blank" rel="noopener noreferrer" className="flex w-fit items-center gap-2 rounded-full bg-volt px-6 py-3 font-extrabold text-ink">
-            Book on the official site <ExternalLink aria-hidden className="size-4" />
-          </a>
-        )}
         <p className="text-sm text-mist">Live Show Radar doesn&apos;t sell tickets. You&apos;ll complete your purchase on the ticketing site.</p>
       </Section>
 

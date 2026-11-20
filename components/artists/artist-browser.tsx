@@ -2,7 +2,9 @@
 
 import { Check, Plus, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
-import { followArtistById, unfollowArtist } from "@/lib/artists/actions";
+import { SaveBar, useUnsavedWarning } from "@/components/save-bar";
+import { saveArtistChanges } from "@/lib/artists/actions";
+import { diffSets } from "@/lib/artists/selection";
 import { filterArtists, groupByLetter, LETTERS, letterCounts, letterOf, type BrowseArtist, type Region } from "@/lib/artists/browse";
 import { cn } from "@/lib/utils/cn";
 
@@ -13,12 +15,14 @@ const regions: { key: Region; label: string }[] = [
 ];
 
 export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[]; followedIds: string[] }) {
-  const [followed, setFollowed] = useState(() => new Set(followedIds));
+  const [saved, setSaved] = useState(() => new Set(followedIds));
+  const [followed, setFollowed] = useState(() => new Set(followedIds));   // local selection; only Save writes it
   const [region, setRegion] = useState<Region>("all");
   const [letter, setLetter] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string>();
-  const [, start] = useTransition();
+  const [note, setNote] = useState<string>();
+  const [saving, start] = useTransition();
 
   const inScope = useMemo(() => filterArtists(artists, { region, letter: null, query }), [artists, region, query]);
   const counts = useMemo(() => letterCounts(inScope), [inScope]);
@@ -26,16 +30,21 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
 
   const shown = groups.reduce((n, g) => n + g.artists.length, 0);
 
+  const { add, remove } = diffSets(saved, followed);
+  const changes = add.length + remove.length;
+  useUnsavedWarning(changes > 0);
+
   function toggle(a: BrowseArtist) {
-    const was = followed.has(a.artist_id);
+    setError(undefined); setNote(undefined);
+    setFollowed((s) => { const n = new Set(s); if (n.has(a.artist_id)) n.delete(a.artist_id); else n.add(a.artist_id); return n; });
+  }
+  function save() {
     setError(undefined);
-    setFollowed((s) => { const n = new Set(s); if (was) n.delete(a.artist_id); else n.add(a.artist_id); return n; });
     start(async () => {
-      const res = was ? await unfollowArtist(a.artist_id) : await followArtistById(a.artist_id);
-      if (res.error) {
-        setError(res.error);
-        setFollowed((s) => { const n = new Set(s); if (was) n.add(a.artist_id); else n.delete(a.artist_id); return n; });   // revert
-      }
+      const res = await saveArtistChanges({ addIds: add, addNames: [], removeIds: remove });
+      if (res.error) { setError(res.error); return; }
+      setSaved(new Set(followed));
+      setNote("Saved. We'll look for their shows on the next check (within about 30 minutes).");
     });
   }
 
@@ -69,9 +78,11 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
         </nav>
         <p aria-live="polite" className="text-sm text-mist">
           {shown} artist{shown === 1 ? "" : "s"}{letter ? ` starting with ${letter}` : ""} · you follow {followed.size}
-          <span className="font-semibold text-hotpink">{error ? ` · ${error}` : ""}</span>
         </p>
       </div>
+
+      <SaveBar changes={changes} saving={saving} onSave={save} onDiscard={() => { setFollowed(new Set(saved)); setError(undefined); }}
+        label="Save artists" savedNote={note} error={error} />
 
       {groups.length === 0 && (
         <p className="rounded-2xl border border-dashed border-line p-6 text-mist">
@@ -84,11 +95,12 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
           <ul className="flex flex-wrap gap-2">
             {g.artists.map((a) => {
               const on = followed.has(a.artist_id);
+              const unsaved = on !== saved.has(a.artist_id);
               return (
                 <li key={a.artist_id}>
                   <button type="button" aria-pressed={on} onClick={() => toggle(a)}
                     className={cn("flex items-center gap-1.5 rounded-full border-2 px-3.5 py-1.5 font-bold transition-colors",
-                      on ? "border-volt bg-volt text-ink" : "border-line text-bone hover:border-mist")}>
+                      on ? (unsaved ? "border-dashed border-acid bg-acid/15 text-acid" : "border-volt bg-volt text-ink") : unsaved ? "border-dashed border-hotpink text-mist line-through" : "border-line text-bone hover:border-mist")}>
                     {on ? <Check aria-hidden className="size-4" /> : <Plus aria-hidden className="size-4 text-volt" />}{a.artist_name}
                   </button>
                 </li>

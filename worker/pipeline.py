@@ -42,12 +42,13 @@ def _empty_stats() -> Dict[str, int]:
 
 
 def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False,
-        limit: int = config.DEFAULT_SOURCE_LIMIT,
+        limit: int = config.DEFAULT_SOURCE_LIMIT, catalog_limit: int = config.DEFAULT_CATALOG_LIMIT,
         on_change: Optional[Callable[[EventChange], None]] = None) -> Dict[str, int]:
     stats = _empty_stats()
-    artists: List[Dict[str, Any]] = repo.tracked_artists()
+    tracked_ids = repo.tracked_artist_ids()
+    artists: List[Dict[str, Any]] = repo.catalog_artists(tracked_ids)      # followed artists + the whole catalog
     if not artists:
-        log.info("No followed artists yet: nothing to do.")
+        log.info("No artists in the catalog: nothing to do.")
         return stats
     by_id = {a["artist_id"]: a for a in artists}
     stamp = now.isoformat()
@@ -72,11 +73,12 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
             repo.upsert_ticket(dict(row, event_id=event_id))
 
     if not dry_run:
-        for a in artists:
-            if a.get("official_website"):
+        known = repo.source_urls()
+        for a in artists:                                  # register official sites that are not sources yet
+            if a.get("official_website") and a["official_website"] not in known:
                 repo.ensure_source("artist_website", a["official_website"], a["artist_id"])
 
-    for src in repo.sources_to_check(HTML_SOURCE_TYPES, list(by_id), limit):
+    for src in repo.sources_to_check(HTML_SOURCE_TYPES, tracked_ids, stamp, limit, catalog_limit):
         stats["sources"] += 1
         result = fetcher.fetch(src["source_url"])
         if result.status != OK:
@@ -87,7 +89,7 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                 repo.update_source(src["source_id"], result.status, stamp)
             continue
 
-        ref = "sha256:" + hashlib.sha256(result.text.encode("utf-8")).hexdigest()
+        ref = "sha256:" + hashlib.sha256(result.text.encode("utf-8")).hexdigest() + "|v" + config.EXTRACTOR_VERSION
         if repo.last_content_ref(src["source_id"]) == ref:
             stats["unchanged"] += 1
             if not dry_run:
@@ -95,7 +97,7 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
                 repo.update_source(src["source_id"], "ok", stamp)
             continue
 
-        for cand in extract_all(result.text, result.url):
+        for cand in extract_all(result.text, result.url, official_owner=bool(src.get("artist_id"))):
             if cand.event_date < (now - dt.timedelta(days=1)).date().isoformat():
                 stats["past_skipped"] += 1             # never create or alert on shows that already happened
                 continue

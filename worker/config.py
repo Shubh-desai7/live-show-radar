@@ -10,7 +10,10 @@ REQUEST_TIMEOUT = 15          # seconds
 MAX_BYTES = 2_000_000         # per fetched page
 MIN_HOST_DELAY = 2.0          # seconds between requests to the same host
 MAX_REDIRECTS = 3
-DEFAULT_SOURCE_LIMIT = 40     # sources checked per run
+# Bump when extraction logic changes: pages are re-processed once even if their content is unchanged.
+EXTRACTOR_VERSION = "3"
+DEFAULT_SOURCE_LIMIT = 300    # followed-artist + promoter sources checked per run
+DEFAULT_CATALOG_LIMIT = 25    # other catalog artists' sources checked per run (each at most once a day)
 
 
 def require_env(name: str) -> str:

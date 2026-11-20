@@ -17,6 +17,8 @@ import sys
 
 from worker import config
 from worker.collectors.http import PoliteFetcher
+from worker.collectors.musicbrainz import MusicBrainzClient
+from worker.discovery.sites import discover_sites
 from worker.database.client import SupabaseRest
 from worker.database.repo import Repo
 from worker.notifications import engine
@@ -51,12 +53,16 @@ def _telegram_or_none():
 def cmd_discover(args, repo: Repo, now: dt.datetime) -> dict:
     directory = repo.user_directory()
     alerts = {"alerts_created": 0}
+    fetcher = PoliteFetcher(allow_local=config.flag("WORKER_ALLOW_LOCAL"))
 
     def on_change(change) -> None:
         alerts["alerts_created"] += engine.create_event_alert(repo, directory, change, now)
 
-    stats = run(repo, PoliteFetcher(allow_local=config.flag("WORKER_ALLOW_LOCAL")), now=now,
-                dry_run=args.dry_run, limit=args.limit, on_change=None if args.dry_run else on_change)
+    stats: dict = {}
+    if not args.skip_sites:                       # find + verify official sites for artists that have none (bounded per run)
+        stats.update(discover_sites(repo, MusicBrainzClient(), fetcher, repo.tracked_artist_ids(), now, dry_run=args.dry_run))
+    stats.update(run(repo, fetcher, now=now, dry_run=args.dry_run, limit=args.limit,
+                     on_change=None if args.dry_run else on_change))
     stats.update(alerts)
     telegram = None if args.dry_run else _telegram_or_none()
     if telegram:
@@ -78,7 +84,8 @@ def main(argv=None) -> int:
     sub = ap.add_subparsers(dest="command")
     d = sub.add_parser("discover", help="discovery + event alerts (default)")
     d.add_argument("--dry-run", action="store_true", help="fetch and extract but write nothing")
-    d.add_argument("--limit", type=int, default=config.DEFAULT_SOURCE_LIMIT, help="max sources per run")
+    d.add_argument("--limit", type=int, default=config.DEFAULT_SOURCE_LIMIT, help="max followed/promoter sources per run")
+    d.add_argument("--skip-sites", action="store_true", help="skip automatic official-site discovery (MusicBrainz)")
     r = sub.add_parser("remind", help="schedule reminders and deliver due notifications")
     r.add_argument("--dry-run", action="store_true", help="compute reminders but write/send nothing")
     argv = list(sys.argv[1:] if argv is None else argv)

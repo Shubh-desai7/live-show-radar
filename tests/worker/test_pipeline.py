@@ -14,9 +14,11 @@ class FakeRepo:
         self.events, self.logs, self.updates, self.ensured, self.touched = [], [], [], [], []
         self.tickets = {}
 
-    def tracked_artists(self): return self.artists
+    def tracked_artist_ids(self): return [a["artist_id"] for a in self.artists]
+    def catalog_artists(self, tracked_ids): return self.artists
+    def source_urls(self): return {a[1] for a in self.ensured}
     def ensure_source(self, *a): self.ensured.append(a)
-    def sources_to_check(self, types, ids, limit): return self.sources
+    def sources_to_check(self, types, tracked_ids, now_iso, t1, t2): return self.sources
     def last_content_ref(self, sid): return next((l[2] for l in reversed(self.logs) if l[0] == sid and l[3] == "processed"), None)
     def insert_log(self, sid, url, ref, status): self.logs.append((sid, url, ref, status))
     def find_event(self, aid, city, date):
@@ -235,3 +237,22 @@ def test_official_site_fills_in_missing_venue_on_an_existing_event():
     run(repo, page(ld_page(LD_EVENT)), now=NOW)
     ev = repo.events[0]
     assert (ev["venue"], ev["event_name"]) == ("Palace Grounds", "Band Live")
+
+
+def test_changing_the_extractor_version_reprocesses_an_unchanged_page(monkeypatch):
+    from worker import config
+    repo = FakeRepo([ARTIST], [OWN])
+    run(repo, page(PAGE), now=NOW)
+    assert run(repo, page(PAGE), now=LATER)["unchanged"] == 1
+    monkeypatch.setattr(config, "EXTRACTOR_VERSION", "next")
+    stats = run(repo, page(PAGE), now=LATER)
+    assert stats["unchanged"] == 0 and stats["events_existing"] == 1
+
+
+def test_official_page_with_one_indian_ticket_link_fills_the_booking_url_of_an_existing_show():
+    repo = FakeRepo([ARTIST], [OWN])
+    repo.events.append({"event_id": "e0", "artist_id": "a1", "city": "Bengaluru", "event_date": "2026-12-20", "confidence": "confirmed",
+                        "status": "scheduled", "source_id": "s1", "booking_url": None, "venue": None, "event_name": None})
+    html = '<ul><li class="show">Sat 20 Dec 2026 Bengaluru</li></ul><a href="https://in.bookmyshow.com/events/band/ET9">Tour</a>'
+    run(repo, page(html), now=NOW)
+    assert repo.events[0]["booking_url"] == "https://in.bookmyshow.com/events/band/ET9"

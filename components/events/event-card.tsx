@@ -1,3 +1,4 @@
+import { ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { ConcertCard } from "./concert-card";
 import { deadlineShort, formatEventDate, nextDeadline, timeUntil } from "@/lib/events/dashboard";
@@ -17,18 +18,30 @@ export function EventCard({ event, now }: { event: EventRow; now: Date }) {
     ? event.status === "cancelled" ? "Cancelled" : "Postponed"
     : next ? `${deadlineShort[next.kind]} ${timeUntil(next.at, now)}` : undefined;
 
+  const link = event.tickets?.booking_url ?? event.booking_url;
+
   return (
-    <Link href={`/events/${event.event_id}`} className="block rounded-3xl transition-transform hover:-translate-y-1">
-      <ConcertCard
-        artist={event.artist.artist_name}
-        city={event.city ?? "City TBA"}
-        venue={event.venue ?? undefined}
-        date={formatEventDate(event.event_date)}
-        confidence={confidence}
-        highlight={highlight}
-        tone={toneFor(event.artist.artist_name)}
-        className={off ? "grayscale opacity-70" : undefined}
-      />
-    </Link>
+    <div className="flex flex-col gap-2">
+      <Link href={`/events/${event.event_id}`} className="block rounded-3xl transition-transform hover:-translate-y-1">
+        <ConcertCard
+          artist={event.artist.artist_name}
+          city={event.city ?? "City TBA"}
+          venue={event.venue ?? undefined}
+          date={formatEventDate(event.event_date)}
+          confidence={confidence}
+          highlight={highlight}
+          tone={toneFor(event.artist.artist_name)}
+          className={off ? "grayscale opacity-70" : undefined}
+        />
+      </Link>
+      {!off && (link ? (
+        <a href={link} target="_blank" rel="noopener noreferrer"
+          className="flex w-fit items-center gap-1.5 rounded-full bg-volt px-4 py-1.5 text-sm font-extrabold text-ink">
+          Official booking link <ExternalLink aria-hidden className="size-3.5" />
+        </a>
+      ) : (
+        <span className="text-sm text-mist">No booking link published yet</span>
+      ))}
+    </div>
   );
 }

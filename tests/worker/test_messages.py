@@ -49,3 +49,10 @@ def test_missing_city_and_date_are_never_invented():
 def test_unknown_type_is_an_error():
     with pytest.raises(ValueError):
         render("nope", EV, None, "UTC", NOW)
+
+
+def test_messages_label_the_link_as_official_and_say_so_when_there_is_none():
+    assert "Official booking link: https://x.example/book" in render("new_event", EV, TICKET, "UTC", NOW)
+    nolink = dict(EV, booking_url=None)
+    assert "No booking link has been published yet" in render("new_event", nolink, dict(TICKET, booking_url=None), "UTC", NOW)
+    assert "No booking link" not in render("event_cancelled", nolink, None, "UTC", NOW)      # cancellations don't need one

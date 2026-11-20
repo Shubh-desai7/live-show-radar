@@ -68,6 +68,8 @@ def render(ntype: str, ev: Dict[str, Any], ticket: Optional[Dict[str, Any]], tz:
     else:
         raise ValueError("unknown notification type: " + ntype)
     if link:
-        lines.append("Details / tickets: " + link)
+        lines.append("Official booking link: " + link)
+    elif ntype in ("new_event",) or ntype in LABELS:
+        lines.append("No booking link has been published yet; check the official page.")
     lines.append(FOOTER)
     return "\n".join(lines)

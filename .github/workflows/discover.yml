@@ -1,9 +1,11 @@
 name: Discover events
 
 # Best effort: GitHub cron can start late or skip runs under load. Never rely on exact timing.
+# Every 30 minutes: followed artists' and promoters' pages are re-checked each run; other catalog artists' pages
+# at most once a day; up to 18 artists per run get their official site discovered (MusicBrainz) and verified.
 on:
   schedule:
-    - cron: "17 1,7,13,19 * * *"   # 4x a day (UTC), off the hour to avoid the busiest minute
+    - cron: "7,37 * * * *"         # twice an hour, off the busiest minutes
   workflow_dispatch:
 
 permissions:
@@ -16,7 +18,7 @@ concurrency:
 jobs:
   discover:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
