@@ -13,7 +13,7 @@ _MONTHS = {
 }
 _M = r"(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")"
 _SUFFIX = r"(?:st|nd|rd|th)?"
-_RANGE = r"(?:\s*[-–]\s*\d{1,2}" + _SUFFIX + r")?"   # "20-21": the start day is captured
+_RANGE = r"(?:\s*(?:[-–]|to|and|&)\s*\d{1,2}" + _SUFFIX + r")?"   # "20-21", "5 and 6", "24 to 27": the start day is captured
 
 # 20 Dec 2026 / 20th December, 2026 / 20-21 Dec 2026
 _DMY = re.compile(r"\b(\d{1,2})" + _SUFFIX + _RANGE + r"\s+" + _M + r"\.?,?\s+(\d{4})\b", re.IGNORECASE)

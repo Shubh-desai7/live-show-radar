@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 from worker import config
 from worker.collectors.http import OK, PoliteFetcher
 from worker.extractors.page import extract_all
+from worker.extractors.roundup import act_name
 from worker.extractors.tickets import drop_late_moments, extract_ticket_info
 from worker.matching.artists import Match, match_artists_detailed
 from worker.verification.classify import CONFIRMED, RANK, RUMOURED, classify, is_upgrade
@@ -108,6 +109,10 @@ def run(repo, fetcher: PoliteFetcher, *, now: dt.datetime, dry_run: bool = False
             else:
                 owners = match_artists_detailed(cand.snippet, artists)
                 owner_source = False
+                if not owners and cand.event_name and src["source_type"] == "promoter_website" and not dry_run:
+                    act_id = repo.ensure_act_artist(act_name(cand.event_name))   # a promoter's show by someone outside the catalog
+                    if act_id:
+                        owners = [Match({"artist_id": act_id, "artist_name": act_name(cand.event_name)}, False)]
 
             for m in owners:
                 artist_id = m.artist["artist_id"]

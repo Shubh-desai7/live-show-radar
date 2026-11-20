@@ -6,7 +6,7 @@ import { VerificationBadge } from "@/components/events/verification-badge";
 import { requireUser } from "@/lib/auth/session";
 import { deadlineLabel, formatDateTime, formatEventDate, formatMoment, sourceTypeLabel, upcomingDeadlines, type DeadlineKind } from "@/lib/events/dashboard";
 import { loadEvent } from "@/lib/events/queries";
-import { toVisible } from "@/lib/events/status";
+import { bookingLabel, toVisible } from "@/lib/events/status";
 import { loadUserSetup } from "@/lib/settings/queries";
 
 function safeHost(url: string): string {
@@ -51,9 +51,9 @@ async function Body({ id }: { id: string }) {
         <div className="flex flex-col gap-1">
           <a href={link} target="_blank" rel="noopener noreferrer"
             className="flex w-fit items-center gap-2 rounded-full bg-volt px-8 py-4 text-lg font-extrabold text-ink">
-            Official booking link <ExternalLink aria-hidden className="size-5" />
+            {bookingLabel(confidence)} <ExternalLink aria-hidden className="size-5" />
           </a>
-          <span className="text-sm text-mist">Opens {safeHost(link)}, the link published by the official source. You buy there; we don&apos;t sell tickets.</span>
+          <span className="text-sm text-mist">Opens {safeHost(link)}. {confidence === "confirmed" ? "This is the link published by the official source." : "It comes from a news article, so confirm on the official page."} You buy there; we don&apos;t sell tickets.</span>
         </div>
       ) : (
         <p className="rounded-2xl border border-dashed border-line p-4 text-mist">{confidence === "confirmed" ? "No booking link has been published yet. We\u2019ll message you if one appears." : "No booking link yet. This is a news report, not an official announcement; look for the official page before you book."}</p>

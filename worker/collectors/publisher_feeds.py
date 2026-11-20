@@ -5,6 +5,7 @@ from __future__ import annotations
 
 PUBLISHER_FEEDS = [
     "https://rollingstoneindia.com/feed/",
+    "https://rollingstoneindia.com/category/gig-calendar/feed/",   # festival / gig roundups (full article text in the feed)
     "https://www.thehindu.com/entertainment/music/feeder/default.rss",
     "https://indianexpress.com/section/entertainment/music/feed/",
     "https://www.hindustantimes.com/feeds/rss/entertainment/music/rssfeed.xml",

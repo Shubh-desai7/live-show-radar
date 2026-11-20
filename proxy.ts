@@ -24,7 +24,7 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getClaims();
   const signedIn = !!data?.claims;
   const path = request.nextUrl.pathname;
-  const isPrivate = ["/dashboard", "/artists", "/events", "/settings", "/onboarding"].some(
+  const isPrivate = ["/dashboard", "/shows", "/artists", "/events", "/settings", "/onboarding"].some(
     (p) => path === p || path.startsWith(p + "/"),
   );
 

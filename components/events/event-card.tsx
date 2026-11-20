@@ -4,7 +4,7 @@ import { Tilt } from "@/components/motion/tilt";
 import { ConcertCard } from "./concert-card";
 import { deadlineShort, formatEventDate, nextDeadline, timeUntil } from "@/lib/events/dashboard";
 import type { EventRow } from "@/lib/events/queries";
-import { toVisible } from "@/lib/events/status";
+import { bookingLabel, toVisible } from "@/lib/events/status";
 
 const tones = ["volt", "grape", "hotpink", "ember"] as const;
 const toneFor = (name: string) => tones[[...name].reduce((n, c) => n + c.charCodeAt(0), 0) % tones.length];
@@ -38,7 +38,7 @@ export function EventCard({ event, now }: { event: EventRow; now: Date }) {
       {!off && (link ? (
         <a href={link} target="_blank" rel="noopener noreferrer"
           className="flex w-fit items-center gap-1.5 rounded-full bg-volt px-4 py-1.5 text-sm font-extrabold text-ink">
-          Official booking link <ExternalLink aria-hidden className="size-3.5" />
+          {bookingLabel(confidence)} <ExternalLink aria-hidden className="size-3.5" />
         </a>
       ) : (
         <span className="text-sm text-mist">No booking link published yet</span>

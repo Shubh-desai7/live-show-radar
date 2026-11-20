@@ -20,3 +20,8 @@ export const confidenceLabel: Record<Exclude<Confidence, "rumoured">, string> = 
 export function toVisible(c: Confidence): Exclude<Confidence, "rumoured"> | null {
   return c === "rumoured" ? null : c;
 }
+
+/** Honest wording for a booking/details link: only confirmed shows have an *official* link. */
+export function bookingLabel(confidence: Confidence): string {
+  return confidence === "confirmed" ? "Official booking link" : "Event / ticket page (unverified)";
+}

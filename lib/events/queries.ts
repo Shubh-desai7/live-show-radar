@@ -59,3 +59,12 @@ export async function loadEvent(supabase: SupabaseClient, eventId: string): Prom
   const e = data ? normalise(data as unknown as Raw) : null;
   return e && isUserVisible(e.confidence) ? e : null;
 }
+
+
+/** Every upcoming show we know about, for anyone, in any city. RLS already hides rumoured events; filtered again defensively. */
+export async function loadAllUpcoming(supabase: SupabaseClient, now: Date): Promise<EventRow[]> {
+  const today = now.toISOString().slice(0, 10);
+  const { data } = await supabase.from("events").select(SELECT).or(`event_date.gte.${today},event_date.is.null`).order("event_date", { ascending: true }).limit(1000);
+  return ((data ?? []) as unknown as Raw[]).map(normalise).filter((e): e is EventRow => !!e)
+    .filter((e) => isUserVisible(e.confidence) && e.status !== "cancelled" && e.status !== "completed");
+}

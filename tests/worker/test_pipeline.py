@@ -27,6 +27,9 @@ class FakeRepo:
         ev = dict(row, event_id="e%d" % (len(self.events) + 1))
         self.events.append(ev)
         return ev
+    def ensure_act_artist(self, name):
+        self.acts = getattr(self, "acts", {})
+        return self.acts.setdefault(name.lower(), "act-" + str(len(self.acts) + 1))
     def get_ticket(self, eid): return self.tickets.get(eid)
     def upsert_ticket(self, row): self.tickets[row["event_id"]] = dict(self.tickets.get(row["event_id"], {}), **row)
     def update_event(self, eid, values):
@@ -226,7 +229,9 @@ def test_promoter_structured_event_is_matched_to_the_followed_artist_by_performe
     other = dict(LD_EVENT, name="Jazz Night", startDate="2027-01-20T20:00:00+05:30", performer={"name": "Other Act"})
     repo = FakeRepo([nucleya], [PROMO])
     run(repo, page(ld_page(mine, other), PROMO["source_url"]), now=NOW)
-    assert [(e["artist_id"], e["event_name"]) for e in repo.events] == [("a3", "Bass Night")]
+    got = [(e["artist_id"], e["event_name"], e["confidence"]) for e in repo.events]
+    assert got[0] == ("a3", "Bass Night", "confirmed")
+    assert got[1] == ("act-1", "Jazz Night", "confirmed") and len(got) == 2     # a promoter's show by someone outside the catalog is kept, under an "act"
 
 
 def test_official_site_fills_in_missing_venue_on_an_existing_event():
@@ -256,3 +261,11 @@ def test_official_page_with_one_indian_ticket_link_fills_the_booking_url_of_an_e
     html = '<ul><li class="show">Sat 20 Dec 2026 Bengaluru</li></ul><a href="https://in.bookmyshow.com/events/band/ET9">Tour</a>'
     run(repo, page(html), now=NOW)
     assert repo.events[0]["booking_url"] == "https://in.bookmyshow.com/events/band/ET9"
+
+
+def test_promoter_show_by_someone_outside_the_catalog_is_kept_under_an_act_named_after_the_event():
+    repo = FakeRepo([ARTIST], [PROMO])
+    ev = dict(LD_EVENT, name="Sunburn Festival 2026", performer="Organization")
+    run(repo, page(ld_page(ev), PROMO["source_url"]), now=NOW)
+    assert [(e["artist_id"], e["event_name"], e["confidence"], e["venue"]) for e in repo.events] == [("act-1", "Sunburn Festival 2026", "confirmed", "Palace Grounds")]
+    assert repo.acts == {"sunburn festival": "act-1"}                          # trailing year removed from the act name

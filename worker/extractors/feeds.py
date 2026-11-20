@@ -15,6 +15,7 @@ class FeedItem:
     link: str
     summary: str
     published: Optional[dt.datetime]    # timezone-aware UTC
+    content: str = ""                   # full article HTML when the feed includes it (content:encoded)
 
 
 def parse_feed(text: str) -> List[FeedItem]:
@@ -25,5 +26,6 @@ def parse_feed(text: str) -> List[FeedItem]:
         published = dt.datetime.fromtimestamp(calendar.timegm(t), tz=dt.timezone.utc) if t else None
         link = e.get("link") or ""
         if link.startswith(("http://", "https://")):
-            items.append(FeedItem(e.get("title", ""), link, e.get("summary", ""), published))
+            content = e["content"][0].get("value", "") if e.get("content") else ""
+            items.append(FeedItem(e.get("title", ""), link, e.get("summary", ""), published, content))
     return items

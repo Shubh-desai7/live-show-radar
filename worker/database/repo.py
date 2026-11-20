@@ -243,3 +243,19 @@ class Repo:
             return row["source_id"]
         found = self.db.select("sources", {"select": "source_id", "source_url": "eq." + url, "limit": "1"})
         return found[0]["source_id"] if found else None
+
+    # ------------------------------------------------------------------ "acts": festivals / events without a catalog artist
+    def ensure_act_artist(self, name: str) -> Optional[str]:
+        """Find-or-create a non-catalog `artists` row (e.g. a festival) so shows by anyone can be stored."""
+        like = "ilike." + name.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        found = self.db.select("artists", {"select": "artist_id", "artist_name": like, "limit": "1"})
+        if found:
+            return found[0]["artist_id"]
+        try:
+            row = self.db.insert("artists", {"artist_name": name, "metadata": {"origin": "act"}})
+            return row["artist_id"] if row else None
+        except DatabaseError as exc:
+            if exc.status != 409:
+                raise
+            again = self.db.select("artists", {"select": "artist_id", "artist_name": like, "limit": "1"})
+            return again[0]["artist_id"] if again else None
