@@ -29,7 +29,7 @@ Never invent event information. Accuracy beats visual appeal. A status change (e
 
 ## Technology stack (approved)
 
-**Frontend:** Next.js (App Router), TypeScript, React, Tailwind CSS, shadcn/ui (selective use only), Lucide React icons. Custom Spotify-Wrapped-inspired dark UI; expressive, modern display typography suited to music culture (specific fonts pending approval, see Open decisions).
+**Frontend:** Next.js (App Router), TypeScript, React, Tailwind CSS, shadcn/ui (selective use only), Lucide React icons, GSAP for motion. Custom Spotify-Wrapped-inspired dark UI; expressive, modern display typography suited to music culture (specific fonts pending approval, see Open decisions).
 
 **Backend (web):** Next.js server functionality (Server Components/Actions) and Route Handlers in TypeScript where an HTTP API is needed (e.g. Telegram webhook).
 
@@ -294,6 +294,14 @@ Code: `worker/notifications/engine.py` (scheduling + delivery), `messages.py` (p
 - Events whose `city` is null are not shown on the dashboard (they cannot match a chosen city). Revisit when the worker's city extraction is built.
 - Login now redirects to `/dashboard`, which forwards incomplete users to `/onboarding`.
 
+## UI motion with GSAP (2026-11-20)
+- **Libraries:** `gsap` 3.15 (+ `ScrollTrigger`) and `@gsap/react` (`useGSAP`). GSAP's "no charge" standard licence applies (free incl. plugins; not for tools that compete with visual animation builders). Registered once in `lib/motion/gsap.ts`, which re-exports `gsap`, `ScrollTrigger`, `useGSAP`, `MOTION_OK` and `FINE_POINTER`.
+- **Components (`components/motion/`, all client components):** `Reveal` (staggers its direct children in; `scroll` = on entering the viewport, once), `HeroTitle` (word-by-word headline; the h1 keeps a plain-text `aria-label`), `Float` (drifting sample cards), `Marquee` (decorative ticker, `aria-hidden`, slows on hover), `Backdrop` (two blurred drifting colour blobs, fixed behind the page), `Magnetic` (button leans toward the pointer), `Tilt` (3D card tilt, mouse/trackpad only), `PopIn` (chips pop in). `components/section.tsx` is the animated panel (re-exported from `components/app-shell.tsx`), `components/save-bar.tsx` slides up and bumps its counter, `app/template.tsx` fades pages in on every navigation.
+- **Accessibility rule:** every animation lives inside `gsap.matchMedia().add(MOTION_OK, ...)` (`prefers-reduced-motion: no-preference`; tilt/magnetic also need `FINE_POINTER`), so with "reduce motion" nothing runs and content just shows; `globals.css` also disables CSS animations/transitions under reduced motion. Decorative elements are `aria-hidden`. Only transform/opacity/visibility are animated (no layout properties). **Not verified:** the reduced-motion path in a real browser (the test pane cannot emulate it); it relies on the standard media query gate.
+- **No flash / never stuck hidden:** an inline script in `app/layout.tsx` sets `<html data-motion="ok">` before first paint when motion is allowed, and `globals.css` pre-hides `[data-reveal-group] > *`, `[data-section]` and `[data-word]` only under that attribute (so first-paint content is hidden without a flash). GSAP then takes over with inline styles, and `app/template.tsx` removes the attribute 2.2 s after `load` as a safety net so unclaimed content can never stay invisible. `body` background is transparent (the `html` element paints the ink colour) so the fixed `Backdrop` can sit behind content.
+- **Gotchas:** (1) Animated items that appear after streaming (inside `<Suspense>`) must animate themselves on mount (`Section`, `Reveal` inside the streamed body), not depend on the page-level wrapper. (2) GSAP ticks on `requestAnimationFrame`: a background/hidden tab freezes animations mid-way and they finish when the tab is shown. When testing in the browser pane, front the tab first (`tabs_select`) and wait for hydration (React props on DOM nodes) before clicking, otherwise screenshots show half-faded pages. (3) The dev server is much slower than production, so animations start late there. (4) Keep new animations behind `MOTION_OK` and clean up with `return () => mm.revert()`.
+- **Verified (local dev + production, tab in front):** hero words and all reveal groups end at opacity 1; sections/cards reveal on scroll; no horizontal overflow at 375 px; card tilt applies and resets; staging an artist slides in the save bar ("2 unsaved changes"), chips pop in, Discard removes them; no console errors.
+
 ## Design system
 
 "Dark mode. Loud colours. Big energy. Zero missed shows." Spotify Wrapped × underground posters, as inspiration only.
@@ -323,6 +331,7 @@ Sequence: 1 project setup + design system → 2 Supabase connection + auth → 3
 ## Decisions log
 - 2026-11-20: Project initialised from product brief.
 - 2026-11-20: Stack and architecture approved (Next.js/TS/Tailwind/shadcn, Supabase, Python worker on GitHub Actions, Vercel, Telegram). All open-decision proposals approved as written (fonts, Vitest+pytest, email+Google auth, schema additions, keep-alive, 15-min reminder cadence). Repo visibility: public was listed first but is still to be chosen when the GitHub repo is created.
+- 2026-11-20: UI motion added with GSAP (landing, page transitions, reveals, tilt, save bar), gated by prefers-reduced-motion.
 - 2026-11-20: Owner chose news RSS over event APIs; Google News fetch was blocked (robots.txt) and not worked around; robots-respecting publisher feeds added as unconfirmed reports (`publisher_rss`).
 - 2026-11-20: Owner request implemented: explicit Save for artists/cities, official booking links on site and Telegram, 30-minute discovery, catalog-wide matching, MusicBrainz-based official-site discovery with strict verification.
 - 2026-11-20: Telegram token rotated (webhook re-registered, GitHub + Vercel updated). Artist catalog expanded to 502 with an A-Z browser at `/artists/browse` after owner request ("all top artists in India and world, A to Z, and additional ones").
