@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "telegram:webhook": "node --env-file=.env.local scripts/telegram-webhook.mjs",
-    "telegram:setup": "bash scripts/set-telegram-token.sh"
+    "telegram:setup": "bash scripts/set-telegram-token.sh",
+    "secret:set": "bash scripts/set-env-secret.sh"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
