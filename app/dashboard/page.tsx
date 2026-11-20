@@ -15,6 +15,12 @@ async function Body() {
   if (!isOnboarded(followed.length, cities.length)) redirect("/onboarding");
 
   const now = new Date();
+  const [{ data: sourceRows }, { data: officialRows }] = await Promise.all([
+    supabase.from("sources").select("source_type, source_url"),
+    supabase.from("artists").select("artist_id").in("artist_id", followed.map((a) => a.artist_id)).not("official_website", "is", null),
+  ]);
+  const hosts = [...new Set((sourceRows ?? []).map((r) => { try { return new URL(r.source_url as string).hostname.replace(/^www\./, ""); } catch { return null; } }).filter((h): h is string => !!h))];
+  const withOwnPage = officialRows?.length ?? 0;
   const events = (await loadEventsForUser(supabase, followed.map((a) => a.artist_id), cities, now))
     .sort((a, b) => (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999"));
   const active = events.filter((e) => e.status !== "cancelled" && e.status !== "completed");
@@ -36,7 +42,7 @@ async function Body() {
         <Section title="Upcoming shows">
           {/* Honest empty state: no fake events. Discovery arrives in steps 6-8. */}
           <div className="rounded-2xl border border-dashed border-line p-8 text-mist">
-            No shows found yet for your artists in your cities. Show discovery isn&apos;t switched on in this build, so nothing is being checked yet.
+            No shows found yet for your artists in your cities. That does not mean none are happening: we only check a few sources so far (see &ldquo;How we find your shows&rdquo; below).
           </div>
         </Section>
       ) : (
@@ -73,6 +79,16 @@ async function Body() {
           </Section>
         </>
       )}
+      <Section title="How we find your shows">
+        <p className="text-mist">
+          We check {hosts.length} source{hosts.length === 1 ? "" : "s"} a few times a day{hosts.length ? <>: <b className="text-bone">{hosts.join(", ")}</b></> : null}.
+          A show appears here only if one of those pages lists one of your {followed.length} artists in one of your {cities.length} cities.
+          {" "}{withOwnPage} of your artists {withOwnPage === 1 ? "has" : "have"} their own official page being checked; for the rest we depend on promoter pages.
+        </p>
+        <p className="text-sm text-mist">
+          So an empty list means &ldquo;none found in the pages we can read&rdquo;, not &ldquo;no shows&rdquo;. We don&apos;t scrape ticketing sites like BookMyShow or Insider, and many artist sites can&apos;t be read automatically. Adding more sources is how coverage grows.
+        </p>
+      </Section>
     </>
   );
 }
