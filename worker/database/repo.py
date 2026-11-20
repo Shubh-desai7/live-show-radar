@@ -226,3 +226,20 @@ class Repo:
         if d.status == "ok":
             for url in d.source_urls:
                 self.ensure_source("artist_website", url, artist["artist_id"])
+
+    # ------------------------------------------------------------------ publisher RSS feeds (unconfirmed reports)
+    def publisher_sources_due(self, now_iso: str, recheck_minutes: int) -> List[Dict[str, Any]]:
+        now = dt.datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
+        cutoff = (now - dt.timedelta(minutes=recheck_minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return self.db.select("sources", {
+            "select": "source_id,source_url", "source_type": "eq.publisher_rss", "artist_id": "is.null",
+            "or": "(last_checked_at.is.null,last_checked_at.lt.%s)" % cutoff, "order": "last_checked_at.asc.nullsfirst", "limit": "50"})
+
+    def article_source(self, url: str, artist_id: str) -> Optional[str]:
+        """One `sources` row per article that produced an event, so the event page can link the article."""
+        row = self.db.insert("sources", {"source_type": "publisher_rss", "source_url": url, "artist_id": artist_id,
+                                         "access_status": "ok"}, ignore_duplicates=True, on_conflict="source_url")
+        if row:
+            return row["source_id"]
+        found = self.db.select("sources", {"select": "source_id", "source_url": "eq." + url, "limit": "1"})
+        return found[0]["source_id"] if found else None

@@ -97,5 +97,6 @@ export const sourceTypeLabel: Record<string, string> = {
   artist_website: "Official artist website",
   promoter_website: "Promoter website",
   google_news_rss: "News report (Google News)",
+  publisher_rss: "News report (publisher feed, not an official source)",
   newsletter: "Newsletter",
 };

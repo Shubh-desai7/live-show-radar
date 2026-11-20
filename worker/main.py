@@ -19,6 +19,7 @@ from worker import config
 from worker.collectors.http import PoliteFetcher
 from worker.collectors.musicbrainz import MusicBrainzClient
 from worker.discovery.sites import discover_sites
+from worker.feeds_pipeline import run_feeds
 from worker.database.client import SupabaseRest
 from worker.database.repo import Repo
 from worker.notifications import engine
@@ -63,6 +64,8 @@ def cmd_discover(args, repo: Repo, now: dt.datetime) -> dict:
         stats.update(discover_sites(repo, MusicBrainzClient(), fetcher, repo.tracked_artist_ids(), now, dry_run=args.dry_run))
     stats.update(run(repo, fetcher, now=now, dry_run=args.dry_run, limit=args.limit,
                      on_change=None if args.dry_run else on_change))
+    if not args.skip_feeds:                       # headline-level reports from allowed publisher feeds: Unconfirmed only
+        stats.update(run_feeds(repo, fetcher, repo.catalog_artists(repo.tracked_artist_ids()), now=now, dry_run=args.dry_run))
     stats.update(alerts)
     telegram = None if args.dry_run else _telegram_or_none()
     if telegram:
@@ -86,6 +89,7 @@ def main(argv=None) -> int:
     d.add_argument("--dry-run", action="store_true", help="fetch and extract but write nothing")
     d.add_argument("--limit", type=int, default=config.DEFAULT_SOURCE_LIMIT, help="max followed/promoter sources per run")
     d.add_argument("--skip-sites", action="store_true", help="skip automatic official-site discovery (MusicBrainz)")
+    d.add_argument("--skip-feeds", action="store_true", help="skip publisher RSS feeds (unconfirmed news reports)")
     r = sub.add_parser("remind", help="schedule reminders and deliver due notifications")
     r.add_argument("--dry-run", action="store_true", help="compute reminders but write/send nothing")
     argv = list(sys.argv[1:] if argv is None else argv)
