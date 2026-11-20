@@ -7,11 +7,12 @@ import { normalizeArtistName } from "@/lib/artists/validate";
 
 const chipTones = ["bg-volt text-ink", "bg-grape text-bone", "bg-hotpink text-ink", "bg-ember text-ink", "bg-acid text-ink"];
 
-export function ArtistPicker({ followed }: { followed: Artist[] }) {
+export function ArtistPicker({ followed, suggestions = [] }: { followed: Artist[]; suggestions?: Artist[] }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Artist[]>([]);
   const [error, setError] = useState<string>();
   const [pending, start] = useTransition();
+  const [justFollowed, setJustFollowed] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const q = query.trim();
@@ -38,7 +39,7 @@ export function ArtistPicker({ followed }: { followed: Artist[] }) {
       <div className="relative">
         <label htmlFor="artist-search" className="sr-only">Search or add an artist</label>
         <input id="artist-search" value={query} onChange={(e) => setQuery(e.target.value)} autoComplete="off"
-          placeholder="Search or type an artist name…"
+          placeholder="Search, or type any artist and press Enter…"
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (name) follow(name); } }}
           className="w-full rounded-xl border border-line bg-ink-2 px-4 py-3 text-bone placeholder:text-mist" />
         {name.length >= 2 && (
@@ -63,6 +64,23 @@ export function ArtistPicker({ followed }: { followed: Artist[] }) {
         )}
       </div>
       <p aria-live="polite" className="min-h-5 text-sm font-semibold text-hotpink">{error}</p>
+      {suggestions.filter((a) => !followedIds.has(a.artist_id) && !justFollowed.has(a.artist_id)).length > 0 && (
+        <div className="flex flex-col gap-2">
+          <h3 className="text-sm font-bold uppercase tracking-wide text-mist">Popular on Live Show Radar: tap to follow</h3>
+          <ul className="flex flex-wrap gap-2">
+            {suggestions.filter((a) => !followedIds.has(a.artist_id) && !justFollowed.has(a.artist_id)).map((a) => (
+              <li key={a.artist_id}>
+                <button type="button" disabled={pending}
+                  onClick={() => { setJustFollowed((s) => new Set(s).add(a.artist_id)); follow(a.artist_name); }}
+                  className="flex items-center gap-1 rounded-full border-2 border-line px-4 py-1.5 font-bold hover:border-volt">
+                  <Plus aria-hidden className="size-4 text-volt" />{a.artist_name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="text-xs text-mist">These are popular picks, not personalised to your taste yet (we don&apos;t read your listening data).</p>
+        </div>
+      )}
       {followed.length === 0 ? (
         <p className="text-mist">You&apos;re not following anyone yet.</p>
       ) : (

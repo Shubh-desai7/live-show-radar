@@ -6,10 +6,10 @@ import { loadUserSetup } from "@/lib/settings/queries";
 
 async function Body() {
   const { supabase, user } = await requireUser();
-  const { followed } = await loadUserSetup(supabase, user.id);
+  const { followed, suggestions } = await loadUserSetup(supabase, user.id);
   return (
     <Section title="Artists you follow" hint="Add or remove artists any time.">
-      <ArtistPicker followed={followed} />
+      <ArtistPicker followed={followed} suggestions={suggestions} />
     </Section>
   );
 }

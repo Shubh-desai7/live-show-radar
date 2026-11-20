@@ -10,12 +10,12 @@ import { loadUserSetup } from "@/lib/settings/queries";
 
 async function Body() {
   const { supabase, user } = await requireUser();
-  const { followed, cities, prefs } = await loadUserSetup(supabase, user.id);
+  const { followed, cities, prefs, suggestions } = await loadUserSetup(supabase, user.id);
   const ready = isOnboarded(followed.length, cities.length);
   return (
     <>
       <Section title="1. Who do you want to catch live?" hint="Search, or type any name to add it. Follow as many as you like.">
-        <ArtistPicker followed={followed} />
+        <ArtistPicker followed={followed} suggestions={suggestions} />
       </Section>
       <Section title="2. Which cities?" hint="Bengaluru first, but pick every city you'd travel to.">
         <CityPicker selected={cities} />
