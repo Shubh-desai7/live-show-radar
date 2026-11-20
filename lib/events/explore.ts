@@ -41,3 +41,11 @@ export function groupByDate(shows: Show[]): { date: string | null; shows: Show[]
   }
   return [...m.entries()].map(([date, list]) => ({ date, shows: list }));
 }
+
+/** "Venue, City" without repeating the city when the venue text already ends with it. */
+export function placeLabel(venue: string | null, city: string | null): string {
+  if (!venue) return city ?? "City to be announced";
+  if (!city) return venue;
+  const v = venue.trim().toLowerCase(), c = city.trim().toLowerCase();
+  return v.endsWith(c) ? venue : `${venue}, ${city}`;
+}

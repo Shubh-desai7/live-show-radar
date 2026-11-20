@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cityCounts, filterShows, groupByDate, type Show } from "@/lib/events/explore";
+import { cityCounts, filterShows, groupByDate, placeLabel, type Show } from "@/lib/events/explore";
 
 const S = (o: Partial<Show> & { id: string }): Show => ({ artist: "A", name: null, city: "Mumbai", venue: null, date: "2026-12-01", confidence: "confirmed", status: "scheduled", link: null, sourceType: null, ...o });
 const shows = [
@@ -24,5 +24,14 @@ describe("all-shows filters", () => {
     expect(cityCounts(shows)[0]).toEqual({ city: "Bengaluru", count: 1 });
     expect(cityCounts([...shows, S({ id: "5", city: "Mumbai" })])[0]).toEqual({ city: "Mumbai", count: 2 });
     expect(groupByDate(shows).map((g) => g.date)).toEqual(["2026-12-01", "2026-12-05", "2026-12-18", null]);
+  });
+});
+
+describe("place label", () => {
+  it("does not repeat the city when the venue already ends with it", () => {
+    expect(placeLabel("Hilltop, Vagator, Goa", "Goa")).toBe("Hilltop, Vagator, Goa");
+    expect(placeLabel("Prism by Octavium", "Bengaluru")).toBe("Prism by Octavium, Bengaluru");
+    expect(placeLabel(null, "Pune")).toBe("Pune");
+    expect(placeLabel(null, null)).toBe("City to be announced");
   });
 });

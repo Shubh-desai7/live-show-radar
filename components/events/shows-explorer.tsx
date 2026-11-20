@@ -4,7 +4,7 @@ import { ExternalLink, MapPin, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Reveal } from "@/components/motion/reveal";
-import { cityCounts, filterShows, groupByDate, type Show } from "@/lib/events/explore";
+import { cityCounts, filterShows, groupByDate, placeLabel, type Show } from "@/lib/events/explore";
 import { bookingLabel } from "@/lib/events/status";
 import { cn } from "@/lib/utils/cn";
 
@@ -72,7 +72,7 @@ export function ShowsExplorer({ shows, today, sources }: { shows: Show[]; today:
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <Link href={`/events/${s.id}`} className="font-display text-xl font-extrabold hover:text-volt">{s.artist}</Link>
                     {s.name && s.name !== s.artist && <span className="truncate text-sm text-mist">{s.name}</span>}
-                    <span className="flex items-center gap-1.5 text-sm text-mist"><MapPin aria-hidden className="size-3.5" />{[s.venue, s.city].filter(Boolean).join(", ") || "City to be announced"}</span>
+                    <span className="flex items-center gap-1.5 text-sm text-mist"><MapPin aria-hidden className="size-3.5" />{placeLabel(s.venue, s.city)}</span>
                   </div>
                   <span className={cn("rounded-full px-2.5 py-1 text-xs font-extrabold uppercase", s.confidence === "confirmed" ? "bg-volt text-ink" : "border-2 border-dashed border-acid text-acid")}>{s.confidence}</span>
                   <span className="text-xs text-mist">{s.sourceType ? sourceLabel[s.sourceType] ?? s.sourceType : "Source not recorded"}</span>
