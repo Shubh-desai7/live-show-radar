@@ -48,3 +48,32 @@ def find_dates(text: str) -> List[dt.date]:
         if d not in out:
             out.append(d)
     return out
+
+
+# ---------------------------------------------------------------- news: day + month without a year
+_DM = re.compile(r"\b(\d{1,2})" + _SUFFIX + _RANGE + r"\s+" + _M + r"\b(?!\.?,?\s+\d{4})", re.IGNORECASE)
+_MD = re.compile(r"\b" + _M + r"\.?\s+(\d{1,2})" + _SUFFIX + _RANGE + r"\b(?!,?\s+\d{4})", re.IGNORECASE)
+
+
+def find_dates_relative(text: str, published: dt.date) -> List[dt.date]:
+    """News headlines say "Nov 27" without a year. Dates with an explicit year are used as written; a bare day+month is
+    read as its next occurrence on or after (published date - 1 day), never more than ~12 months ahead. Only for sources
+    that are labelled Unconfirmed: a published date is a strong anchor, but it is still an inference."""
+    explicit = find_dates(text)
+    if explicit:
+        return explicit
+    found = []
+    for m in _DM.finditer(text):
+        found.append((m.start(), int(m.group(1)), _MONTHS[m.group(2).lower()]))
+    for m in _MD.finditer(text):
+        found.append((m.start(), int(m.group(2)), _MONTHS[m.group(1).lower()]))
+    out: List[dt.date] = []
+    floor, ceiling = published - dt.timedelta(days=1), published + dt.timedelta(days=300)
+    for _, day, month in sorted(found):
+        for year in (published.year, published.year + 1):
+            d = _make(year, month, day)
+            if d is not None and d >= floor:
+                if d <= ceiling and d not in out:      # a "date" almost a year out is far more likely a past date
+                    out.append(d)
+                break
+    return out
