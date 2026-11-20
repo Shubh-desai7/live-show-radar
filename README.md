@@ -5,7 +5,7 @@ Personalised concert discovery and alerts for music fans in India: follow artist
 Full context, architecture and decisions live in [CLAUDE.md](CLAUDE.md).
 
 ## Status
-Steps 1-4 and 6-10 are built: design system, Supabase schema + email auth, onboarding and settings, and the event discovery UI (dashboard + event pages). There is no real event data yet (the worker has not been run against real sites), Telegram linking, alerts and 24h/2h reminders are built and tested against the real Telegram API; delivery to a real phone and the deployed webhook are still to be verified (step 11), so the dashboard shows an honest empty state.
+**Live:** https://live-show-radar-lac.vercel.app. All planned steps are built: design system, Supabase schema + email auth, onboarding and settings, event UI, the Python discovery worker (robots-aware, classification, ticket intelligence), Telegram linking, 24h/2h reminders, CI and scheduled workers. There is **no real event data yet**: real artist/promoter sources must be added (see CLAUDE.md, "Operating it"). A real Telegram delivery to a phone and email-confirmed signup have not been verified yet. Alerts run on GitHub Actions cron, which is best effort and never real-time.
 
 ## Run it
 Requires Node 20+ (developed on Node 24).
