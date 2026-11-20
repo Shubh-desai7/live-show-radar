@@ -39,3 +39,6 @@ Create a bot with @BotFather, then set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERN
 
 ## Artists
 A curated catalog of 500+ well-known artists (India and world) can be browsed A to Z at `/artists/browse`. It is generated from `scripts/gen_artist_catalog.py`; anyone not listed can still be added by typing a name.
+
+## How shows are found
+A worker runs every ~30 minutes (GitHub Actions, best effort): it discovers and verifies artists' official sites (MusicBrainz + a name check), re-reads their tour pages and promoter pages, and updates shows, official booking links and ticket dates. Not every artist has a readable page, so coverage is partial; the dashboard shows what is being checked. Telegram alerts include the official booking link.
