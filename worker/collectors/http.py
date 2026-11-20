@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 import time
 from dataclasses import dataclass
 from typing import Callable, Dict, Optional
@@ -35,6 +36,20 @@ def _is_private_host(host: str) -> bool:
     except ValueError:
         return False
     return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+
+
+def decode_body(body: bytes, content_type: str) -> str:
+    """Honour a declared charset; otherwise UTF-8 (requests would guess Latin-1 for text/*, garbling modern pages)."""
+    m = re.search(r"charset=([\w.-]+)", content_type or "", re.IGNORECASE)
+    if m:
+        try:
+            return body.decode(m.group(1), "replace")
+        except LookupError:
+            pass
+    try:
+        return body.decode("utf-8")
+    except UnicodeDecodeError:
+        return body.decode("cp1252", "replace")
 
 
 class PoliteFetcher:
@@ -76,18 +91,30 @@ class PoliteFetcher:
         if origin in self._robots:
             return self._robots[origin]
         parser: Optional[RobotFileParser] = RobotFileParser()
+        target = origin + "/robots.txt"
         try:
-            resp = self._get(origin + "/robots.txt")
-            code = resp.status_code
-            if code == 200:
-                parser.parse(resp.content[: config.MAX_BYTES].decode("utf-8", "replace").splitlines())
-            elif code in (404, 410):
-                parser.parse([])                      # no robots.txt: nothing restricted
+            for _ in range(config.MAX_REDIRECTS + 2):          # RFC 9309: follow a few redirects for robots.txt
+                resp = self._get(target)
+                code = resp.status_code
+                if code in (301, 302, 303, 307, 308) and resp.headers.get("Location"):
+                    target = urljoin(target, resp.headers["Location"])
+                    resp.close()
+                    if urlparse(target).scheme not in ("http", "https"):
+                        parser = None
+                        break
+                    continue
+                if code == 200:
+                    parser.parse(resp.content[: config.MAX_BYTES].decode("utf-8", "replace").splitlines())
+                elif code in (404, 410):
+                    parser.parse([])                      # no robots.txt: nothing restricted
+                else:
+                    parser = None                         # 401/403/5xx/odd redirect: treat as restricted
+                resp.close()
+                break
             else:
-                parser = None                         # 401/403/5xx...: treat as restricted
-            resp.close()
+                parser = None                             # redirect loop
         except requests.RequestException:
-            parser = None                             # can't verify: do not crawl
+            parser = None                                 # can't verify: do not crawl
         self._robots[origin] = parser
         return parser
 
@@ -127,8 +154,7 @@ class PoliteFetcher:
                 body = resp.raw.read(config.MAX_BYTES + 1, decode_content=True)
                 if len(body) > config.MAX_BYTES:
                     return FetchResult(ERROR, current, detail="response too large")
-                encoding = resp.encoding or "utf-8"
-                return FetchResult(OK, current, text=body.decode(encoding, "replace"))
+                return FetchResult(OK, current, text=decode_body(body, ctype))
             finally:
                 resp.close()
         return FetchResult(ERROR, current, detail="too many redirects")

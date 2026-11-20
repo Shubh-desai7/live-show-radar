@@ -5,7 +5,7 @@ Personalised concert discovery and alerts for music fans in India: follow artist
 Full context, architecture and decisions live in [CLAUDE.md](CLAUDE.md).
 
 ## Status
-**Live:** https://live-show-radar-lac.vercel.app. All planned steps are built: design system, Supabase schema + email auth, onboarding and settings, event UI, the Python discovery worker (robots-aware, classification, ticket intelligence), Telegram linking, 24h/2h reminders, CI and scheduled workers. There is **no real event data yet**: real artist/promoter sources must be added (see CLAUDE.md, "Operating it"). A real Telegram delivery to a phone and email-confirmed signup have not been verified yet. Alerts run on GitHub Actions cron, which is best effort and never real-time.
+**Live:** https://live-show-radar-lac.vercel.app. All planned steps are built: design system, Supabase schema + email auth, onboarding and settings, event UI, the Python discovery worker (robots-aware, classification, ticket intelligence), Telegram linking, 24h/2h reminders, CI and scheduled workers. Real event data is just starting: one real official source is live (Diljit Dosanjh's tour page); more artist/promoter sources must be added case by case (see CLAUDE.md, "Real sources evaluated" and "Operating it"). A real Telegram delivery to a phone and email-confirmed signup have not been verified yet. Alerts run on GitHub Actions cron, which is best effort and never real-time.
 
 ## Run it
 Requires Node 20+ (developed on Node 24).

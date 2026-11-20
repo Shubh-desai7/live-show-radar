@@ -86,3 +86,27 @@ def test_per_host_rate_limit_sleeps_between_requests():
     f.fetch("https://a.example/1")
     f.fetch("https://a.example/2")
     assert slept and all(s <= 2.0 for s in slept)
+
+
+def test_robots_txt_redirect_is_followed_and_its_rules_apply():
+    s = {"https://a.example/robots.txt": Resp(301, headers={"Location": "https://www.a.example/robots.txt"}),
+         "https://www.a.example/robots.txt": Resp(200, b"User-agent: *\nDisallow: /private/"),
+         "https://a.example/tour": Resp(200, b"ok"), "https://a.example/private/x": Resp(200, b"no")}
+    f = fetcher(s)
+    assert f.fetch("https://a.example/tour").status == http.OK
+    assert f.fetch("https://a.example/private/x").status == http.ROBOTS_DISALLOWED
+
+
+def test_robots_redirect_loop_is_treated_as_restricted():
+    s = {"https://a.example/robots.txt": Resp(301, headers={"Location": "https://a.example/robots.txt"}),
+         "https://a.example/p": Resp(200, b"x")}
+    assert fetcher(s).fetch("https://a.example/p").status == http.ROBOTS_DISALLOWED
+
+
+def test_pages_without_a_declared_charset_are_decoded_as_utf8_not_latin1():
+    body = "Tour — Ahmedabad".encode("utf-8")
+    assert http.decode_body(body, "text/html") == "Tour — Ahmedabad"
+    assert http.decode_body(body, "text/html; charset=utf-8") == "Tour — Ahmedabad"
+    assert http.decode_body("café".encode("latin-1"), "text/html; charset=iso-8859-1") == "café"
+    assert http.decode_body("café".encode("cp1252"), "text/html") == "café"          # invalid UTF-8 falls back
+    assert http.decode_body(body, "text/html; charset=nonsense") == "Tour — Ahmedabad"
