@@ -82,7 +82,7 @@ async function Body() {
       <Section title="How we find your shows">
         <p className="text-mist">
           We check {hosts.length} source{hosts.length === 1 ? "" : "s"} a few times a day{hosts.length ? <>: <b className="text-bone">{hosts.join(", ")}</b></> : null}.
-          A show appears here only if one of those pages lists one of your {followed.length} artists in one of your {cities.length} cities.
+          A show appears here only if one of those pages lists one of your {followed.length} artist{followed.length === 1 ? "" : "s"} in {cities.length === 1 ? "your city" : `one of your ${cities.length} cities`}.
           {" "}{withOwnPage} of your artists {withOwnPage === 1 ? "has" : "have"} their own official page being checked; for the rest we depend on promoter pages.
         </p>
         <p className="text-sm text-mist">
