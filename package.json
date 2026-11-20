@@ -11,7 +11,8 @@
     "test": "vitest run",
     "telegram:webhook": "node --env-file=.env.local scripts/telegram-webhook.mjs",
     "telegram:setup": "bash scripts/set-telegram-token.sh",
-    "secret:set": "bash scripts/set-env-secret.sh"
+    "secret:set": "bash scripts/set-env-secret.sh",
+    "scheduler:setup": "bash scripts/setup-scheduler.sh"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
