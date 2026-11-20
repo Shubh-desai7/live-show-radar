@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppShell, Section } from "@/components/app-shell";
+import { Reveal } from "@/components/motion/reveal";
 import { EventCard } from "@/components/events/event-card";
 import { requireUser } from "@/lib/auth/session";
 import { isOnboarded } from "@/lib/artists/validate";
@@ -49,33 +50,33 @@ async function Body() {
         <>
           {deadlines.length > 0 && (
             <Section title="Don't miss these" hint={`Times shown in ${timezone}.`}>
-              <ul className="flex flex-col gap-3">
+              <Reveal as="ul" stagger={0.09} className="flex flex-col gap-3">
                 {deadlines.map(({ e, kind, at }) => (
                   <li key={`${e.event_id}-${kind}`}>
                     <Link href={`/events/${e.event_id}`} className="flex flex-wrap items-center gap-3 rounded-2xl bg-ink-3 p-4 hover:bg-line">
-                      <span className="rounded-md bg-acid px-2 py-1 text-xs font-extrabold uppercase text-ink">{timeUntil(at, now)}</span>
+                      <span className="animate-wobble rounded-md bg-acid px-2 py-1 text-xs font-extrabold uppercase text-ink">{timeUntil(at, now)}</span>
                       <span className="font-display text-xl font-extrabold">{e.artist.artist_name}</span>
                       <span className="text-mist">{deadlineLabel[kind]}: {formatMoment(at, timezone, !!e.tickets?.timing_reliable)}</span>
                       {!e.tickets?.timing_reliable && <span className="text-xs font-bold text-ember">timing not verified</span>}
                     </Link>
                   </li>
                 ))}
-              </ul>
+              </Reveal>
             </Section>
           )}
 
           {fresh.length > 0 && (
             <Section title="Just announced" hint="First spotted in the last 7 days.">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Reveal scroll className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {fresh.map((e) => <EventCard key={e.event_id} event={e} now={now} />)}
-              </div>
+              </Reveal>
             </Section>
           )}
 
           <Section title="All upcoming shows">
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Reveal scroll className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((e) => <EventCard key={e.event_id} event={e} now={now} />)}
-            </div>
+            </Reveal>
           </Section>
         </>
       )}

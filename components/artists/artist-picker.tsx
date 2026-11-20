@@ -3,6 +3,7 @@
 import { Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
+import { PopIn } from "@/components/motion/pop-in";
 import { SaveBar, useUnsavedWarning } from "@/components/save-bar";
 import { saveArtistChanges, searchArtists, type Artist } from "@/lib/artists/actions";
 import { dedupeNames } from "@/lib/artists/selection";
@@ -124,16 +125,16 @@ export function ArtistPicker({ followed, suggestions = [] }: { followed: Artist[
             );
           })}
           {added.map((a) => (
-            <li key={a.artist_id} className="flex items-center gap-1 rounded-full border-2 border-dashed border-acid py-1.5 pl-4 pr-2 font-bold text-acid">
+            <PopIn as="li" key={a.artist_id} className="flex items-center gap-1 rounded-full border-2 border-dashed border-acid py-1.5 pl-4 pr-2 font-bold text-acid">
               {a.artist_name} <span className="text-xs uppercase">unsaved</span>
               <button type="button" aria-label={`Remove ${a.artist_name} from unsaved`} onClick={() => setAdded((l) => l.filter((x) => x.artist_id !== a.artist_id))} className="rounded-full p-1 hover:bg-ink/20"><X aria-hidden className="size-4" /></button>
-            </li>
+            </PopIn>
           ))}
           {addedNames.map((n) => (
-            <li key={n} className="flex items-center gap-1 rounded-full border-2 border-dashed border-acid py-1.5 pl-4 pr-2 font-bold text-acid">
+            <PopIn as="li" key={n} className="flex items-center gap-1 rounded-full border-2 border-dashed border-acid py-1.5 pl-4 pr-2 font-bold text-acid">
               {n} <span className="text-xs uppercase">new, unsaved</span>
               <button type="button" aria-label={`Remove ${n} from unsaved`} onClick={() => setAddedNames((l) => l.filter((x) => x !== n))} className="rounded-full p-1 hover:bg-ink/20"><X aria-hidden className="size-4" /></button>
-            </li>
+            </PopIn>
           ))}
         </ul>
       )}

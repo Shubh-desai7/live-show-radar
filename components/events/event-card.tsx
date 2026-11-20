@@ -1,5 +1,6 @@
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
+import { Tilt } from "@/components/motion/tilt";
 import { ConcertCard } from "./concert-card";
 import { deadlineShort, formatEventDate, nextDeadline, timeUntil } from "@/lib/events/dashboard";
 import type { EventRow } from "@/lib/events/queries";
@@ -22,7 +23,7 @@ export function EventCard({ event, now }: { event: EventRow; now: Date }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <Link href={`/events/${event.event_id}`} className="block rounded-3xl transition-transform hover:-translate-y-1">
+      <Tilt><Link href={`/events/${event.event_id}`} className="block rounded-3xl">
         <ConcertCard
           artist={event.artist.artist_name}
           city={event.city ?? "City TBA"}
@@ -33,7 +34,7 @@ export function EventCard({ event, now }: { event: EventRow; now: Date }) {
           tone={toneFor(event.artist.artist_name)}
           className={off ? "grayscale opacity-70" : undefined}
         />
-      </Link>
+      </Link></Tilt>
       {!off && (link ? (
         <a href={link} target="_blank" rel="noopener noreferrer"
           className="flex w-fit items-center gap-1.5 rounded-full bg-volt px-4 py-1.5 text-sm font-extrabold text-ink">

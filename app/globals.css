@@ -27,7 +27,7 @@
 
 html { background: var(--color-ink); color-scheme: dark; }
 body {
-  background: var(--color-ink);
+  background: transparent; /* the html element paints the ink colour so the fixed Backdrop blobs can sit behind the content */
   color: var(--color-bone);
   font-family: var(--font-sans);
 }
@@ -54,3 +54,8 @@ body {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Pre-hide animated items only when motion is allowed (set by an inline script in layout.tsx); GSAP reveals them. */
+[data-motion="ok"] [data-reveal-group] > *,
+[data-motion="ok"] [data-section],
+[data-motion="ok"] [data-word] { opacity: 0; }

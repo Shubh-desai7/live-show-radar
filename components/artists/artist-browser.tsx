@@ -2,6 +2,7 @@
 
 import { Check, Plus, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
+import { Reveal } from "@/components/motion/reveal";
 import { SaveBar, useUnsavedWarning } from "@/components/save-bar";
 import { saveArtistChanges } from "@/lib/artists/actions";
 import { diffSets } from "@/lib/artists/selection";
@@ -89,6 +90,7 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
           No match in the catalog. You can still follow anyone: go back to Artists, type the name and press Enter.
         </p>
       )}
+      <Reveal scroll y={18} stagger={0.03} className="flex flex-col gap-5">
       {groups.map((g) => (
         <section key={g.letter} aria-labelledby={`l-${g.letter}`} className="flex flex-col gap-2">
           <h2 id={`l-${g.letter}`} className="font-display text-3xl font-extrabold text-volt">{g.letter}</h2>
@@ -109,6 +111,7 @@ export function ArtistBrowser({ artists, followedIds }: { artists: BrowseArtist[
           </ul>
         </section>
       ))}
+      </Reveal>
     </div>
   );
 }
