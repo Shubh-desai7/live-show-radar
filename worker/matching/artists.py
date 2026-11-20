@@ -17,7 +17,11 @@ CONTEXT = re.compile(r"\b(live|concert|tour|gig|perform\w*|headlin\w*|presents?|
 COMMON_WORDS = {
     "queen", "prism", "blue", "love", "home", "indus", "raga", "rock", "pop", "soul", "gold", "echo",
     "river", "storm", "fire", "light", "dream", "dreams", "wild", "alone", "night", "moon", "sun",
+    "ghost", "tool", "muse", "kiss", "future", "passenger", "sting", "eagles", "twice", "seventeen", "disturbed",
+    "bastille", "keane", "tame", "oasis", "cactus", "euphoria", "advaita", "silk", "soulmate", "sanam", "agam",
 }
+# Multi-word names that are also ordinary phrases: treated as ambiguous too.
+AMBIGUOUS_PHRASES = {"take that", "the script", "silk route", "red velvet", "indian ocean", "the local train", "fall out boy"}
 
 
 def normalize(text: str) -> str:
@@ -30,6 +34,8 @@ def normalize(text: str) -> str:
 
 def is_ambiguous_name(name: str) -> bool:
     n = normalize(name)
+    if n in AMBIGUOUS_PHRASES:
+        return True
     tokens = n.split()
     if len(tokens) != 1:
         return False

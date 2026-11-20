@@ -53,3 +53,10 @@ def test_accent_insensitive_match():
 ])
 def test_status_detection(text, expected):
     assert detect_status(text) == expected
+
+
+def test_common_word_artist_names_and_phrases_are_ambiguous():
+    for name in ("Ghost", "Tool", "Muse", "Take That", "The Script", "Indian Ocean", "Zedd"):
+        assert is_ambiguous_name(name), name
+    for name in ("Metallica", "Prateek Kuhad", "Linkin Park", "The Chainsmokers"):
+        assert not is_ambiguous_name(name), name

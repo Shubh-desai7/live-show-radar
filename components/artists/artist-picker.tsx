@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { followArtist, searchArtists, unfollowArtist, type Artist } from "@/lib/artists/actions";
 import { normalizeArtistName } from "@/lib/artists/validate";
@@ -78,6 +79,7 @@ export function ArtistPicker({ followed, suggestions = [] }: { followed: Artist[
               </li>
             ))}
           </ul>
+          <Link href="/artists/browse" className="w-fit font-bold text-volt underline">Browse all artists A–Z (India and world) →</Link>
           <p className="text-xs text-mist">These are popular picks, not personalised to your taste yet (we don&apos;t read your listening data).</p>
         </div>
       )}

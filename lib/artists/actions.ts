@@ -49,3 +49,13 @@ export async function unfollowArtist(artistId: string): Promise<ActionResult> {
   revalidatePath("/", "layout");
   return {};
 }
+
+/** Follow an existing artist by id (used by the A-Z browser; avoids matching on names with symbols like P!nk or KR$NA). */
+export async function followArtistById(artistId: string): Promise<ActionResult> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artistId)) return { error: "Unknown artist." };
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("user_artists").insert({ user_id: user.id, artist_id: artistId });
+  if (error && error.code !== "23505") return { error: "Couldn't follow that artist. Try again." };
+  revalidatePath("/", "layout");
+  return {};
+}
