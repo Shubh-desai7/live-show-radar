@@ -232,7 +232,7 @@ class Repo:
         now = dt.datetime.fromisoformat(now_iso.replace("Z", "+00:00"))
         cutoff = (now - dt.timedelta(minutes=recheck_minutes)).strftime("%Y-%m-%dT%H:%M:%SZ")
         return self.db.select("sources", {
-            "select": "source_id,source_url", "source_type": "eq.publisher_rss", "artist_id": "is.null",
+            "select": "source_id,source_url,last_checked_at", "source_type": "eq.publisher_rss", "artist_id": "is.null",
             "or": "(last_checked_at.is.null,last_checked_at.lt.%s)" % cutoff, "order": "last_checked_at.asc.nullsfirst", "limit": "50"})
 
     def article_source(self, url: str, artist_id: str) -> Optional[str]:

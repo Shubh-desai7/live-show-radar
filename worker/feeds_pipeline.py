@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from worker.collectors.http import OK, PoliteFetcher
+from worker.collectors.gdelt import RECHECK_MINUTES as GDELT_RECHECK, gdelt_urls, is_gdelt
 from worker.collectors.publisher_feeds import PUBLISHER_FEEDS
 from worker.extractors.feeds import parse_feed
 from worker.extractors.news import _plain, candidate_from_item
@@ -23,20 +25,25 @@ log = logging.getLogger("worker")
 
 
 def run_feeds(repo, fetcher: PoliteFetcher, catalog: List[Dict[str, Any]], *, now: dt.datetime, dry_run: bool = False,
-              recheck_minutes: int = 55, report: Optional[RunReport] = None) -> Dict[str, int]:
+              recheck_minutes: int = 55, report: Optional[RunReport] = None, sleep=time.sleep) -> Dict[str, int]:
     report = report if report is not None else RunReport()
     stats = {"feeds_checked": 0, "feed_items": 0, "feed_reports_new": 0, "feeds_failed": 0, "roundup_events_new": 0}
     stamp = now.isoformat()
     if not dry_run:
         known = repo.source_urls()
-        for url in PUBLISHER_FEEDS:
+        for url in list(PUBLISHER_FEEDS) + gdelt_urls():
             if url not in known:
                 repo.ensure_source("publisher_rss", url, None)
 
     for src in repo.publisher_sources_due(stamp, recheck_minutes):
+        if is_gdelt(src["source_url"]) and not _gdelt_due(src, now):
+            continue                                                  # GDELT queries run at most every 6 hours
         stats["feeds_checked"] += 1
         report.counters["sources_attempted"] += 1
         res = fetcher.fetch(src["source_url"])                       # robots.txt honoured
+        if is_gdelt(src["source_url"]) and res.status != OK and "429" in (res.detail or ""):
+            sleep(30)                                                 # GDELT rate limit: one polite retry
+            res = fetcher.fetch(src["source_url"])
         sres = SourceResult(src["source_id"], src["source_url"], res.status, res.detail)
         report.source_results.append(sres)
         trace = Trace()
@@ -77,6 +84,16 @@ def run_feeds(repo, fetcher: PoliteFetcher, catalog: List[Dict[str, Any]], *, no
         if not dry_run:
             repo.update_source(src["source_id"], "ok", stamp)
     return stats
+
+
+def _gdelt_due(src: Dict[str, Any], now: dt.datetime) -> bool:
+    last = src.get("last_checked_at")
+    if not last:
+        return True
+    try:
+        return (now - dt.datetime.fromisoformat(str(last).replace("Z", "+00:00"))).total_seconds() >= GDELT_RECHECK * 60
+    except ValueError:
+        return True
 
 
 def _roundups(repo, catalog: List[Dict[str, Any]], item, now: dt.datetime, stamp: str, dry_run: bool, stats: Dict[str, int],

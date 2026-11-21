@@ -1,6 +1,7 @@
 import datetime as dt
 
 from worker.collectors.http import FetchResult
+from worker.collectors.gdelt import gdelt_urls, is_gdelt, query_url
 from worker.collectors.publisher_feeds import PUBLISHER_FEEDS
 from worker.feeds_pipeline import run_feeds
 from worker.verification.classify import classify
@@ -64,7 +65,7 @@ def test_an_existing_event_is_never_overwritten_by_a_news_report():
 
 def test_feed_sources_are_registered_and_a_failing_feed_is_recorded_not_fatal():
     repo, stats = go(result=FetchResult("robots_disallowed", FEED))
-    assert {u for _, u, _ in repo.ensured} == set(PUBLISHER_FEEDS) and all(t == "publisher_rss" for t, _, _ in repo.ensured)
+    assert {u for _, u, _ in repo.ensured} == set(PUBLISHER_FEEDS) | set(gdelt_urls()) and all(t == "publisher_rss" for t, _, _ in repo.ensured)
     assert repo.events == [] and repo.updates == [("f1", "robots_disallowed")] and stats["feeds_failed"] == 1
 
 
@@ -77,3 +78,30 @@ def test_publisher_reports_can_only_ever_be_unconfirmed_or_rumoured():
     assert classify("publisher_rss", owner_source=False, ambiguous_name=False) == "unconfirmed"
     assert classify("publisher_rss", owner_source=True, ambiguous_name=False) == "unconfirmed"
     assert classify("publisher_rss", owner_source=False, ambiguous_name=True) == "rumoured"
+
+
+def test_gdelt_queries_are_rss_urls_restricted_to_india_sources():
+    urls = gdelt_urls()
+    assert urls and all(is_gdelt(u) and "format=rss" in u and "sourcecountry%3AIN" in u for u in urls)
+    assert not is_gdelt("https://news.example/feed") and "maxrecords=250" in query_url("x")
+
+
+def test_gdelt_429_is_retried_once_then_gives_up_without_crashing():
+    class F:
+        def __init__(self): self.calls = 0
+        def fetch(self, url, **kw):
+            self.calls += 1
+            return FetchResult("blocked", url, detail="HTTP 429")
+    class R(Repo):
+        def publisher_sources_due(self, now_iso, minutes): return [{"source_id": "g1", "source_url": gdelt_urls()[0], "last_checked_at": None}]
+    f, slept = F(), []
+    stats = run_feeds(R(), f, CATALOG, now=NOW, sleep=slept.append)
+    assert f.calls == 2 and slept == [30] and stats["feeds_failed"] == 1
+
+
+def test_gdelt_query_is_skipped_when_checked_within_six_hours():
+    class R(Repo):
+        def publisher_sources_due(self, now_iso, minutes):
+            return [{"source_id": "g1", "source_url": gdelt_urls()[0], "last_checked_at": (NOW - dt.timedelta(hours=2)).isoformat()}]
+    f = Fetcher(FetchResult("ok", "u", text=RSS))
+    assert run_feeds(R(), f, CATALOG, now=NOW)["feeds_checked"] == 0 and f.urls == []

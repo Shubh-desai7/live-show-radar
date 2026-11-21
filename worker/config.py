@@ -38,3 +38,6 @@ def load_env_file(path: str = ".env.local") -> None:
 
 def flag(name: str) -> bool:
     return os.environ.get(name, "").strip() == "1"
+
+# Hosts with an explicit, slower request limit (seconds between requests). GDELT asks for one request per 5 s; we use 12.
+HOST_DELAYS = {"api.gdeltproject.org": 12.0}

@@ -59,6 +59,7 @@ class PoliteFetcher:
         *,
         allow_local: bool = False,
         min_delay: float = config.MIN_HOST_DELAY,
+        host_delays: Optional[Dict[str, float]] = None,
         sleep: Callable[[float], None] = time.sleep,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
@@ -66,6 +67,7 @@ class PoliteFetcher:
         self.session.headers["User-Agent"] = config.USER_AGENT
         self.allow_local = allow_local
         self.min_delay = min_delay
+        self.host_delays = dict(config.HOST_DELAYS if host_delays is None else host_delays)   # slower per-host limits (e.g. GDELT)
         self._sleep = sleep
         self._clock = clock
         self._last_hit: Dict[str, float] = {}
@@ -75,7 +77,7 @@ class PoliteFetcher:
     def _wait(self, host: str) -> None:
         last = self._last_hit.get(host)
         if last is not None:
-            remaining = self.min_delay - (self._clock() - last)
+            remaining = max(self.min_delay, self.host_delays.get(host, 0.0)) - (self._clock() - last)
             if remaining > 0:
                 self._sleep(remaining)
         self._last_hit[host] = self._clock()

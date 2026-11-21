@@ -38,6 +38,7 @@ export default function ShowsPage() {
   return (
     <AppShell title="All shows">
       <Suspense fallback={<p className="text-mist">Loading…</p>}><Body /></Suspense>
+      <p className="mt-8 text-xs text-mist">News-derived reports may be found through the <a className="underline" href="https://www.gdeltproject.org" rel="nofollow noopener noreferrer" target="_blank">GDELT Project</a>.</p>
     </AppShell>
   );
 }
