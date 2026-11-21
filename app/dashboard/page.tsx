@@ -25,9 +25,11 @@ async function Body() {
   const events = (await loadEventsForUser(supabase, followed.map((a) => a.artist_id), cities, now))
     .sort((a, b) => (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999"));
   const followedIds = new Set(events.map((e) => e.event_id));
-  const nearby = (await loadAllUpcoming(supabase, now))                       // real shows in the user's cities by any artist
-    .filter((e) => !followedIds.has(e.event_id) && cityMatches(e.city, cities) && e.event_date)
-    .slice(0, 12);
+  const everything = (await loadAllUpcoming(supabase, now)).filter((e) => !followedIds.has(e.event_id) && e.event_date);
+  const inCities = everything.filter((e) => cityMatches(e.city, cities)).slice(0, 12);   // real shows in the user's cities, any artist
+  const nearby = inCities.length > 0 ? inCities : everything.slice(0, 12);               // nothing there: soonest shows anywhere in India
+  const nearbyTitle = inCities.length > 0 ? "Happening in your cities" : "Coming up across India";
+  const nearbyHint = inCities.length > 0 ? "Real shows by other artists in the cities you track." : "Nothing known yet in your cities, so here are the soonest real shows elsewhere.";
   const active = events.filter((e) => e.status !== "cancelled" && e.status !== "completed");
 
   const deadlines = active
@@ -85,7 +87,7 @@ async function Body() {
         </>
       )}
       {nearby.length > 0 && (
-        <Section title="Happening in your cities" hint="Real shows by other artists in the cities you track.">
+        <Section title={nearbyTitle} hint={nearbyHint}>
           <Reveal scroll className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {nearby.map((e) => <EventCard key={e.event_id} event={e} now={now} />)}
           </Reveal>
