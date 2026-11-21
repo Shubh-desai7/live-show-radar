@@ -22,10 +22,24 @@ export function Tilt({ children, className, max = 6 }: { children: ReactNode; cl
         rx(-((e.clientY - r.top) / r.height - 0.5) * max * 2);
         lift(-6);
       };
-      const leave = () => { rx(0); ry(0); lift(0); };
+      const glow = document.createElement("div");           // pointer-following highlight (decorative, pointer-events none)
+      glow.setAttribute("aria-hidden", "true");
+      Object.assign(glow.style, { position: "absolute", inset: "0", borderRadius: "inherit", pointerEvents: "none", opacity: "0",
+        background: "radial-gradient(260px circle at var(--gx,50%) var(--gy,50%), rgba(255,255,255,.18), transparent 60%)", mixBlendMode: "overlay" });
+      if (getComputedStyle(el).position === "static") el.style.position = "relative";
+      el.appendChild(glow);
+      const glowTo = gsap.quickTo(glow, "opacity", { duration: 0.3 });
+      const track = (e: PointerEvent) => {
+        const r = el.getBoundingClientRect();
+        glow.style.setProperty("--gx", `${e.clientX - r.left}px`);
+        glow.style.setProperty("--gy", `${e.clientY - r.top}px`);
+        glowTo(1);
+      };
+      el.addEventListener("pointermove", track);
+      const leave = () => { rx(0); ry(0); lift(0); glowTo(0); };
       el.addEventListener("pointermove", move);
       el.addEventListener("pointerleave", leave);
-      return () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerleave", leave); };
+      return () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointermove", track); el.removeEventListener("pointerleave", leave); glow.remove(); };
     });
     return () => mm.revert();
   }, { scope: ref });

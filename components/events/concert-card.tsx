@@ -1,3 +1,4 @@
+import { LiveDot } from "@/components/motion/live-dot";
 import { CalendarDays, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { Confidence } from "@/lib/events/status";
@@ -29,7 +30,7 @@ export function ConcertCard({ artist, city, venue, date, confidence, highlight, 
         <div className="flex items-start justify-between gap-3">
           <VerificationBadge confidence={confidence} />
           {highlight && (
-            <span className="rotate-3 rounded-md bg-ink px-2 py-1 text-xs font-extrabold uppercase text-acid">{highlight}</span>
+            <span className="flex rotate-3 items-center gap-1.5 rounded-md bg-ink px-2 py-1 text-xs font-extrabold uppercase text-acid"><LiveDot className="bg-acid" />{highlight}</span>
           )}
         </div>
         <h3 className="font-display text-4xl font-extrabold leading-none tracking-tight">{artist}</h3>

@@ -1,5 +1,6 @@
 "use client";
 
+import { CountUp } from "@/components/motion/count-up";
 import { ExternalLink, MapPin, Search } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
@@ -34,7 +35,7 @@ export function ShowsExplorer({ shows, today, sources }: { shows: Show[]; today:
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-mist">
-        <b className="text-bone">{shows.length} upcoming shows</b> in {cityCounts(shows).length} cities ({confirmed} confirmed by an official source,
+        <b className="text-bone"><CountUp value={shows.length} /> upcoming shows</b> in <CountUp value={cityCounts(shows).length} /> cities (<CountUp value={confirmed} /> confirmed by an official source,
         {" "}{shows.length - confirmed} reported by news and not yet confirmed). This is everything we have found, for any artist, not only the ones you follow.
         It is <b className="text-bone">not</b> every concert in India: we can only list what the pages we are allowed to read publish.
       </p>

@@ -1,3 +1,4 @@
+import { ScrollProgress } from "@/components/motion/scroll-progress";
 import type { Metadata } from "next";
 import { Bricolage_Grotesque, Inter } from "next/font/google";
 import "./globals.css";
@@ -17,7 +18,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* Marks "motion allowed" before first paint so animated items can be pre-hidden by CSS (no flash). Cleared by app/template.tsx. */}
         <script dangerouslySetInnerHTML={{ __html: "try{if(matchMedia('(prefers-reduced-motion: no-preference)').matches)document.documentElement.dataset.motion='ok'}catch(e){}" }} />
       </head>
-      <body className="grain min-h-dvh antialiased">{children}</body>
+      <body className="grain min-h-dvh antialiased"><ScrollProgress />{children}</body>
     </html>
   );
 }
