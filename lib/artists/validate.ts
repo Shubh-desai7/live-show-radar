@@ -14,7 +14,10 @@ export function escapeLike(q: string): string {
   return q.replace(/[\\%_]/g, (c) => "\\" + c);
 }
 
-/** A user is onboarded once they follow at least one artist and track at least one city. */
+/** Minimum artists to follow before the radar opens (enough for the recommendations and alerts to be useful). */
+export const MIN_ARTISTS = 3;
+
+/** A user is onboarded once they follow at least MIN_ARTISTS artists and track at least one city. */
 export function isOnboarded(artistCount: number, cityCount: number): boolean {
-  return artistCount > 0 && cityCount > 0;
+  return artistCount >= MIN_ARTISTS && cityCount > 0;
 }

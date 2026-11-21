@@ -16,7 +16,9 @@ describe("onboarding", () => {
   it("needs at least one artist and one city", () => {
     expect(isOnboarded(0, 1)).toBe(false);
     expect(isOnboarded(1, 0)).toBe(false);
-    expect(isOnboarded(1, 1)).toBe(true);
+    expect(isOnboarded(2, 1)).toBe(false);
+    expect(isOnboarded(3, 0)).toBe(false);
+    expect(isOnboarded(3, 1)).toBe(true);
   });
   it("knows Bengaluru", () => expect(isKnownCity("Bengaluru")).toBe(true));
 });

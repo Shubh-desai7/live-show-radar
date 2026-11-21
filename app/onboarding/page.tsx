@@ -5,7 +5,7 @@ import { ArtistPicker } from "@/components/artists/artist-picker";
 import { CityPicker } from "@/components/settings/city-picker";
 import { PreferencesForm } from "@/components/settings/preferences-form";
 import { requireUser } from "@/lib/auth/session";
-import { isOnboarded } from "@/lib/artists/validate";
+import { isOnboarded, MIN_ARTISTS } from "@/lib/artists/validate";
 import { loadUserSetup } from "@/lib/settings/queries";
 
 async function Body() {
@@ -14,7 +14,7 @@ async function Body() {
   const ready = isOnboarded(followed.length, cities.length);
   return (
     <>
-      <Section title="1. Who do you want to catch live?" hint="Search, or type any name to add it. Follow as many as you like.">
+      <Section title="1. Who do you want to catch live?" hint={`Pick at least ${MIN_ARTISTS}: search, or type any name to add it. Press Save artists to keep them.`}>
         <ArtistPicker followed={followed} suggestions={suggestions} />
       </Section>
       <Section title="2. Which cities?" hint="Bengaluru first, but pick every city you'd travel to.">
@@ -26,7 +26,9 @@ async function Body() {
       {ready ? (
         <Link href="/dashboard" className="w-fit rounded-full bg-volt px-8 py-4 text-lg font-extrabold text-ink">Take me to my radar</Link>
       ) : (
-        <p className="text-mist">Follow at least one artist and pick at least one city to continue.</p>
+        <p className="text-mist">
+          {followed.length < MIN_ARTISTS ? `Saved so far: ${followed.length} of ${MIN_ARTISTS} artists. Follow ${MIN_ARTISTS - followed.length} more` : "Pick at least one city"} to continue.
+        </p>
       )}
     </>
   );
