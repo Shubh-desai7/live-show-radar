@@ -6,8 +6,8 @@ import { Reveal } from "@/components/motion/reveal";
 import { EventCard } from "@/components/events/event-card";
 import { requireUser } from "@/lib/auth/session";
 import { isOnboarded } from "@/lib/artists/validate";
-import { deadlineLabel, formatMoment, isNewlyAnnounced, timeUntil, upcomingDeadlines } from "@/lib/events/dashboard";
-import { loadEventsForUser } from "@/lib/events/queries";
+import { cityMatches, deadlineLabel, formatMoment, isNewlyAnnounced, timeUntil, upcomingDeadlines } from "@/lib/events/dashboard";
+import { loadAllUpcoming, loadEventsForUser } from "@/lib/events/queries";
 import { loadUserSetup } from "@/lib/settings/queries";
 
 async function Body() {
@@ -24,6 +24,10 @@ async function Body() {
   const withOwnPage = officialRows?.length ?? 0;
   const events = (await loadEventsForUser(supabase, followed.map((a) => a.artist_id), cities, now))
     .sort((a, b) => (a.event_date ?? "9999").localeCompare(b.event_date ?? "9999"));
+  const followedIds = new Set(events.map((e) => e.event_id));
+  const nearby = (await loadAllUpcoming(supabase, now))                       // real shows in the user's cities by any artist
+    .filter((e) => !followedIds.has(e.event_id) && cityMatches(e.city, cities) && e.event_date)
+    .slice(0, 12);
   const active = events.filter((e) => e.status !== "cancelled" && e.status !== "completed");
 
   const deadlines = active
@@ -43,7 +47,7 @@ async function Body() {
         <Section title="Upcoming shows">
           {/* Honest empty state: no fake events. Discovery arrives in steps 6-8. */}
           <div className="rounded-2xl border border-dashed border-line p-8 text-mist">
-            No shows found yet for your artists in your cities. That does not mean none are happening: we only check a few sources so far (see &ldquo;How we find your shows&rdquo; below).
+            None of your {followed.length} artist{followed.length === 1 ? "" : "s"} ({followed.slice(0, 4).map((a) => a.artist_name).join(", ")}{followed.length > 4 ? ", …" : ""}) has a show we know of in your cities yet. That does not mean none are happening: we only check the sources we are allowed to read (see &ldquo;How we find your shows&rdquo; below). Real shows in your cities are below.
           </div>
         </Section>
       ) : (
@@ -79,6 +83,14 @@ async function Body() {
             </Reveal>
           </Section>
         </>
+      )}
+      {nearby.length > 0 && (
+        <Section title="Happening in your cities" hint="Real shows by other artists in the cities you track.">
+          <Reveal scroll className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {nearby.map((e) => <EventCard key={e.event_id} event={e} now={now} />)}
+          </Reveal>
+          <Link href="/shows" className="mt-4 inline-block font-bold text-volt underline">See all shows</Link>
+        </Section>
       )}
       <Section title="How we find your shows">
         <p className="text-mist">
