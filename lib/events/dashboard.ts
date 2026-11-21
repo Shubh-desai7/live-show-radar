@@ -99,4 +99,5 @@ export const sourceTypeLabel: Record<string, string> = {
   google_news_rss: "News report (Google News)",
   publisher_rss: "News report (publisher feed, not an official source)",
   newsletter: "Newsletter",
+  jambase: "Concert database (JamBase, not an official source)",
 };

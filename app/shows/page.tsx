@@ -6,14 +6,14 @@ import type { Show } from "@/lib/events/explore";
 import { loadAllUpcoming } from "@/lib/events/queries";
 import { toVisible } from "@/lib/events/status";
 
-const kind: Record<string, string> = { artist_website: "artist site", promoter_website: "promoter", publisher_rss: "news feed", google_news_rss: "news", newsletter: "newsletter" };
+const kind: Record<string, string> = { artist_website: "artist site", promoter_website: "promoter", publisher_rss: "news feed", google_news_rss: "news", newsletter: "newsletter", jambase: "concert database" };
 
 async function Body() {
   const { supabase } = await requireUser();
   const now = new Date();
   const [events, { data: sourceRows }] = await Promise.all([
     loadAllUpcoming(supabase, now),
-    supabase.from("sources").select("source_type, source_url").in("source_type", ["artist_website", "promoter_website", "publisher_rss"]),
+    supabase.from("sources").select("source_type, source_url").in("source_type", ["artist_website", "promoter_website", "publisher_rss", "jambase"]),
   ]);
   const shows: Show[] = events.flatMap((e) => {
     const confidence = toVisible(e.confidence);
@@ -38,7 +38,7 @@ export default function ShowsPage() {
   return (
     <AppShell title="All shows">
       <Suspense fallback={<p className="text-mist">Loading…</p>}><Body /></Suspense>
-      <p className="mt-8 text-xs text-mist">News-derived reports may be found through the <a className="underline" href="https://www.gdeltproject.org" rel="nofollow noopener noreferrer" target="_blank">GDELT Project</a>.</p>
+      <p className="mt-8 text-xs text-mist">Some shows come from <a className="underline" href="https://www.jambase.com" rel="nofollow noopener noreferrer" target="_blank">concert data by JamBase</a>; news-derived reports may be found through the <a className="underline" href="https://www.gdeltproject.org" rel="nofollow noopener noreferrer" target="_blank">GDELT Project</a>.</p>
     </AppShell>
   );
 }

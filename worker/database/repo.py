@@ -235,6 +235,19 @@ class Repo:
             "select": "source_id,source_url,last_checked_at", "source_type": "eq.publisher_rss", "artist_id": "is.null",
             "or": "(last_checked_at.is.null,last_checked_at.lt.%s)" % cutoff, "order": "last_checked_at.asc.nullsfirst", "limit": "50"})
 
+    def jambase_source(self) -> Optional[Dict[str, Any]]:
+        rows = self.db.select("sources", {"select": "source_id,last_checked_at", "source_type": "eq.jambase", "artist_id": "is.null", "limit": "1"})
+        return rows[0] if rows else None
+
+    def jambase_event_source(self, url: str, artist_id: str) -> Optional[str]:
+        """One `sources` row per JamBase event (its URL), so the event page can credit and link it."""
+        row = self.db.insert("sources", {"source_type": "jambase", "source_url": url, "artist_id": artist_id, "access_status": "ok"},
+                             ignore_duplicates=True, on_conflict="source_url")
+        if row:
+            return row["source_id"]
+        found = self.db.select("sources", {"select": "source_id", "source_url": "eq." + url, "limit": "1"})
+        return found[0]["source_id"] if found else None
+
     def article_source(self, url: str, artist_id: str) -> Optional[str]:
         """One `sources` row per article that produced an event, so the event page can link the article."""
         row = self.db.insert("sources", {"source_type": "publisher_rss", "source_url": url, "artist_id": artist_id,

@@ -20,7 +20,9 @@ from worker.collectors.http import PoliteFetcher
 from worker.collectors.musicbrainz import MusicBrainzClient
 from worker.diagnose import analyze
 from worker.discovery.sites import discover_sites
+from worker.collectors.jambase import JamBaseClient
 from worker.feeds_pipeline import run_feeds
+from worker.jambase_pipeline import run_jambase
 from worker.database.client import SupabaseRest
 from worker.database.repo import Repo
 from worker.notifications import engine
@@ -74,6 +76,8 @@ def cmd_discover(args, repo: Repo, now: dt.datetime, report: RunReport) -> dict:
                      on_change=None if args.dry_run else on_change, report=report))
     if not args.skip_feeds:                       # headline-level reports from allowed publisher feeds: Unconfirmed only
         stats.update(run_feeds(repo, fetcher, repo.catalog_artists(repo.tracked_artist_ids()), now=now, dry_run=args.dry_run, report=report))
+    if not args.skip_feeds:                       # licensed event database (needs JAMBASE_API_KEY + JAMBASE_PLAN=developer to write)
+        stats.update(run_jambase(repo, JamBaseClient(), repo.catalog_artists(repo.tracked_artist_ids()), now=now, dry_run=args.dry_run, report=report))
     stats.update(alerts)
     telegram = None if args.dry_run else _telegram_or_none()
     if telegram:

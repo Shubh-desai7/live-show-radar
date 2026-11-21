@@ -9,7 +9,7 @@ import { bookingLabel } from "@/lib/events/status";
 import { cn } from "@/lib/utils/cn";
 
 const sourceLabel: Record<string, string> = {
-  artist_website: "Artist's official site", promoter_website: "Promoter's official site", publisher_rss: "News report", google_news_rss: "News report", newsletter: "Newsletter",
+  artist_website: "Artist's official site", promoter_website: "Promoter's official site", publisher_rss: "News report", google_news_rss: "News report", newsletter: "Newsletter", jambase: "Concert database",
 };
 
 function fmtDate(d: string | null) {
@@ -77,7 +77,7 @@ export function ShowsExplorer({ shows, today, sources }: { shows: Show[]; today:
                   <span className={cn("rounded-full px-2.5 py-1 text-xs font-extrabold uppercase", s.confidence === "confirmed" ? "bg-volt text-ink" : "border-2 border-dashed border-acid text-acid")}>{s.confidence}</span>
                   <span className="text-xs text-mist">{s.sourceType ? sourceLabel[s.sourceType] ?? s.sourceType : "Source not recorded"}</span>
                   {s.link ? (
-                    <a href={s.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 rounded-full bg-ink-3 px-3.5 py-1.5 text-sm font-bold text-bone hover:bg-line">
+                    <a href={s.link} target="_blank" rel={s.sourceType === "jambase" ? "nofollow noopener noreferrer" : "noopener noreferrer"} className="flex items-center gap-1.5 rounded-full bg-ink-3 px-3.5 py-1.5 text-sm font-bold text-bone hover:bg-line">
                       {bookingLabel(s.confidence)} <ExternalLink aria-hidden className="size-3.5" />
                     </a>
                   ) : <span className="text-xs text-mist">No link published yet</span>}

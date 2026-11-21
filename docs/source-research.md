@@ -10,7 +10,7 @@ Policy: only sources whose robots.txt AND terms permit automated reading; never 
 | Google News RSS | news | `Disallow: /` for generic bots | personal feed-reader use only | n/a | Not viable (unchanged). |
 | Google Alerts RSS | news | feeds under www.google.com/alerts/feeds: not verified | not verified | n/a | Needs the owner's Google account and a terms check; not built. |
 | GDELT DOC 2.0 | news index | robots.txt 404 (allowed) | free incl. commercial; cite GDELT; 1 request per 5 s | RSS/JSON, headline only | **Built, yield unmeasured**: every request got HTTP 429 on 2026-11-21 from this network even 20 s apart; retried once per run, skipped for 6 h. Check its yield from the Actions runner. |
-| JamBase Data API | event database | n/a | Developer plan: $0, non-commercial, 1,000 calls/month, attribution; overage $0.05/call | JSON | **Needs the owner's trial key**; India coverage never stated, must be measured first. |
+| JamBase Data API | event database | n/a | Developer plan: $0, non-commercial, 1,000 calls/month, attribution; overage $0.05/call | JSON | **Measured: 31 upcoming India shows, 28 missing from our DB.** Trial key is evaluation-only; production needs the free Developer plan. Collector built, dormant. |
 | Ticketmaster Discovery | event database | n/a | free key; storage limited to "reasonable periods" | JSON | India not listed in coverage: unlikely. Untested. |
 | Bandsintown / Songkick / Seated | artist tools | n/a | artist-account or consent only | n/a | Not viable for an aggregator. |
 | Eventbrite search API | | | shut down in 2019 | | Not viable. |

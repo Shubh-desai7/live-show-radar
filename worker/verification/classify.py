@@ -13,7 +13,7 @@ CONFIRMED, UNCONFIRMED, RUMOURED = "confirmed", "unconfirmed", "rumoured"
 RANK = {RUMOURED: 0, UNCONFIRMED: 1, CONFIRMED: 2}
 
 OFFICIAL_TYPES = ("artist_website", "promoter_website")
-SECONDARY_TYPES = ("newsletter", "google_news_rss", "publisher_rss")
+SECONDARY_TYPES = ("newsletter", "google_news_rss", "publisher_rss", "jambase")
 
 
 def classify(source_type: str, *, owner_source: bool, ambiguous_name: bool) -> str:
